@@ -588,7 +588,7 @@ while True:
 								# if there are files in the pattern directory
 								if len(os.listdir(patterns_directory)) != 0:
 									
-									for pattern_num in range(1, len(os.listdir(patterns_directory)))
+									#for pattern_num in range(1, len(os.listdir(patterns_directory)))
 								
 								
 								
