@@ -82,7 +82,7 @@ def save_list_of_lists(list_of_lists, directory, export_mode, resolution):
 				img = Image.fromarray((el_resized_padded * 255 ))
 				# change bit depth to 24-bit True Color - the only format accepted by DLP2000 default display software
 				img_24 = img.convert("RGB")
-				img_24.save(directory + 'pattern_' + str(i) + '_' + str(j) + '.bmp')
+				img_24.save(directory + str(i) + '_' + str(j) + '.bmp')
 				j += 1
 			i += 1
 		

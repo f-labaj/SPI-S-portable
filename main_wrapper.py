@@ -251,6 +251,10 @@ while True:
 		],
 		
 		[
+			sg.Text("Pattern batch size:", size =(20, 1)), sg.InputText(size=(8, 1), key="-PATTERN_BATCH_SIZE-"),
+		],
+		
+		[
 			sg.Text("Display framerate (without trigger):", size =(25, 1)), sg.InputText(size=(8, 1), key="-FRAMERATE-"),
 		],
 		
@@ -295,7 +299,7 @@ while True:
 				main_window.FindElement("-STATUS-").Update("Reconstruction done.")
 				
 				# DEBUG Fourier plane
-				aux.save_image(np.real(fourier_spectrum_2D_padded), "fourier", "")
+				aux.save_image(np.real(fourier_spectrum_2D_padded), "fourier_padded", "")
 				
 				#aux.save_image(gallery_directory, reconstructed_image, "rec_img")
 				aux.show_images([image, image_resized, np.real(fourier_spectrum_2D_padded), np.real(reconstructed_image)], 1)
@@ -494,11 +498,14 @@ while True:
 						
 						patterns_on_BBB = False
 						
+						trigger_mode = False
+						
 						BBB_window = sg.Window("BBB Control", BBB_layout, finalize=True)
 						
 						while True:
 							BBB_event, BBB_values = BBB_window.read()
 							
+							# returns NoneType, need to check for issues
 							trigger_mode = BBB_values["-TRIGGER_MODE-"]
 							
 							if BBB_event == "Exit" or BBB_event == sg.WIN_CLOSED:
@@ -518,7 +525,12 @@ while True:
 									p_num = 0
 									# pattern batch size - amount of patterns that will be sent to BBB
 									# Check if it works for small pattern sets
-									p_batch_size = 10
+									p_batch_size = int(BBB_values["-PATTERN_BATCH_SIZE-"])
+									
+									# open sftp client on existing connection
+									ftp_client = client.open_sftp()
+									if ftp_client != None:
+										print("SFTP connection opened!")
 									
 									# while the pattern number p_num has not surpassed the pattern amount
 									while p_num < len(os.listdir(patterns_directory)):
@@ -528,27 +540,32 @@ while True:
 										# iterates over all images - might be slow!
 										# alternative - explicitly select images via their numbers
 										for image in pattern_list:
-											if p_num <= int(image[8:11][0]) < p_num + p_batch_size:
-												partial_pattern_dir_list.append(image)
+											# Works only up to 999 patterns!
+											if image[1] == '_':
+												if p_num <= int(image[0]) < p_num + p_batch_size:
+													partial_pattern_dir_list.append(image)
+													
+											elif image[2] == '_':
+												if p_num <= int(image[0:2]) < p_num + p_batch_size:
+													partial_pattern_dir_list.append(image)
+													
+											elif image[3] == '_':
+												if p_num <= int(image[0:3]) < p_num + p_batch_size:
+													partial_pattern_dir_list.append(image)
 										
 										# DEBUG
 										print("Currently batched patterns:\n")
 										print(partial_pattern_dir_list)
 										
-										# open sftp client on existing connection
-										ftp_client = client.open_sftp()
-										if ftp_client != None:
-											print("SFTP connection opened!")
-										
 										# transfer selected patterns to BBB
+										
+										# check zeroing!
 										temp_number = 0
+										
 										for pattern_name in partial_pattern_dir_list:
 											print("Uploading pattern: " + pattern_name)
-											ftp_client.put("./PATTERNS/" + pattern_name, "/home/debian/Desktop/DLP_Control/structured_light/" + temp_number)
+											ftp_client.put("./PATTERNS/" + pattern_name, "/home/debian/Desktop/DLP_Control/structured_light/" + str(temp_number) + ".bmp")
 											temp_number += 1
-											
-										# close client after transfer
-										ftp_client.close()
 											
 										print("Pattern subset sent!")
 										
@@ -559,18 +576,35 @@ while True:
 										# display patterns, according to mode
 										if trigger_mode is True:
 											output = aux.execute_remote_command(client, 'cd /home/debian/Desktop/DLP_Control/structured_light;./pattern_disp -i')
+											print(output[1].readlines())
+											print(output[2].readlines())
 											
 											# trigger the display of concurrent patterns
 											for remote_p_num in range(0, p_batch_size):
 												# get intensity data from single-pixel detector->oscilloscope
-												intensity_vector.append(owon.get_data(osc_device, 1))
+												
+												# DEBUG - commented out for debug
+												#intensity_vector.append(owon.get_data(osc_device, 1))
+												
+												# DEBUG
+												time.sleep(0.5)
 												
 												# software trigger
-												output = aux.execute_remote_command(client, 'printf 1 > /sys/class/gpio/gpio119/value')
+												# GPIO115 is trigger in, as declared in .c files on BBB
+												output = aux.execute_remote_command(client, 'printf 1 > /sys/class/gpio/gpio115/value')
+												print(output[1].readlines())
+												print(output[2].readlines())
+											
+												print("Trigger set to HIGH!")
 											
 										else:
 											output = aux.execute_remote_command(client, 'cd /home/debian/Desktop/DLP_Control/structured_light;./pattern_disp -k ' + BBB_values["-FRAMERATE-"])
+											print(output[1].readlines())
+											print(output[2].readlines())
 											
+									# close client after transfer
+									ftp_client.close()
+									
 									# DEBUG
 									print("Pomiar: \n")
 									print(intensity_vector)

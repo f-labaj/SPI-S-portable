@@ -255,49 +255,70 @@ def calculate_fourier_coeffs(masked_image_list):
 	return fourier_coeff_list
 	
 def reconstruct_image(resolution, scaling, fourier_coeff_list, mode):
-    start = time.time()
+	start = time.time()
 	
-    N = resolution
-    M = int(1/scaling)
+	N = resolution
+	M = int(1/scaling)
     
-    fourier_spectrum = np.array(fourier_coeff_list)
-    fourier_spectrum_2D = np.zeros((N,N))
-    fourier_spectrum_2D_padded = np.zeros((N,N))
-    reconstructed_image = np.zeros((N,N))
+	fourier_spectrum = np.array(fourier_coeff_list)
+	fourier_spectrum_2D = np.zeros((N,N))
+	fourier_spectrum_2D_padded = np.zeros((N,N))
+	reconstructed_image = np.zeros((N,N))
 	
-    if mode is "lowpass":
+	if mode is "lowpass":
 		# TODO - recheck correctness of np.reshape vs real fourier spectrum
-        fourier_spectrum_2D = np.reshape(fourier_spectrum, (int(N/M), int(N/M)))
-        fourier_spectrum_2D_padded = np.zeros((N,N),dtype=complex)
-        fourier_spectrum_2D_padded[0:fourier_spectrum_2D.shape[0], 0:fourier_spectrum_2D.shape[1]] = fourier_spectrum_2D
+		
+		fourier_spectrum_2D = np.reshape(fourier_spectrum, (int(N/M), int(N/M)))
+		
+		fourier_spectrum_2D_padded = np.zeros((N,N),dtype=complex)
+		fourier_spectrum_2D_padded[0:fourier_spectrum_2D.shape[0], 0:fourier_spectrum_2D.shape[1]] = fourier_spectrum_2D
+		
+		#DEBUG
+		aux.save_image(np.real(fourier_spectrum_2D), "fourier_unpadded", "")
+		
+		# # Reshape spectrum to correct quadrant form
+		# coord = len(fourier_spectrum_2D_padded) // 2
+		
+		# q1, q2, q3, q4 = fourier_spectrum_2D_padded[:coord, :coord], fourier_spectrum_2D[coord:, :coord], fourier_spectrum_2D[:coord, coord:], fourier_spectrum_2D[coord:, coord:]
+		
+		# fourier_spectrum_2D_padded[:coord, :coord] = q4
+		# fourier_spectrum_2D_padded[coord:, :coord] = q3
+		# fourier_spectrum_2D_padded[:coord, coord:] = q2
+		# fourier_spectrum_2D_padded[coord:, coord:] = np.flipud(np.fliplr(q1))
+		
+		# # DEBUG
+		# aux.save_image(np.real(q1), "q1", "")
+		# aux.save_image(np.real(q2), "q2", "")
+		# aux.save_image(np.real(q3), "q3", "")
+		# aux.save_image(np.real(q4), "q4", "")
 
-    elif mode is "midpass_alt":
-        fourier_spectrum_2D = np.reshape(fourier_spectrum, (int(N/M), int(N/M)))
+	elif mode is "midpass_alt":
+		fourier_spectrum_2D = np.reshape(fourier_spectrum, (int(N/M), int(N/M)))
 
-    elif mode is "highpass":
-        ####################################################################
-        # Temporary local parameters for highpass compressive sensing TODO!#
-        ####################################################################
-        m_x = 4
-        m_y = 4
+	elif mode is "highpass":
+		####################################################################
+		# Temporary local parameters for highpass compressive sensing TODO!#
+		####################################################################
+		m_x = 4
+		m_y = 4
 	
-        # DO ZMIANY -> uwzględnienie przerw 0-wych między zmierzonymi częstościami
-        fourier_spectrum_zeros = np.dstack((fourier_spectrum,np.zeros_like(fourier_spectrum))).reshape(fourier_spectrum.shape[0],-1)
-        fourier_spectrum_2D = np.reshape(fourier_spectrum_zeros, (int(N-m_x), int(N-m_y)))
-        #fourier_spectrum_2D_padded = np.zeros((N,N),dtype=complex)
-        #fourier_spectrum_2D_padded[m_x:fourier_spectrum_2D.shape[0], m_y:fourier_spectrum_2D.shape[1]] = fourier_spectrum_2D
+		# DO ZMIANY -> uwzględnienie przerw 0-wych między zmierzonymi częstościami
+		fourier_spectrum_zeros = np.dstack((fourier_spectrum,np.zeros_like(fourier_spectrum))).reshape(fourier_spectrum.shape[0],-1)
+		fourier_spectrum_2D = np.reshape(fourier_spectrum_zeros, (int(N-m_x), int(N-m_y)))
+		#fourier_spectrum_2D_padded = np.zeros((N,N),dtype=complex)
+		#fourier_spectrum_2D_padded[m_x:fourier_spectrum_2D.shape[0], m_y:fourier_spectrum_2D.shape[1]] = fourier_spectrum_2D
 
-    if mode is "lowpass":
-        reconstructed_image = fft.ifft2(fourier_spectrum_2D_padded)
+	if mode is "lowpass":
+		reconstructed_image = fft.ifft2(fourier_spectrum_2D_padded)
         
-    else:
-        reconstructed_image = fft.ifft2(fourier_spectrum_2D)
+	else:
+		reconstructed_image = fft.ifft2(fourier_spectrum_2D)
 
-    end = time.time()
+	end = time.time()
 	
-    print("\nReconstruction time: " + str(float(end-start)) + "s\n")
+	print("\nReconstruction time: " + str(float(end-start)) + "s\n")
 	
-    return (reconstructed_image, fourier_spectrum_2D_padded)
+	return (reconstructed_image, fourier_spectrum_2D_padded)
 	
 # TODO -> pass original image etc.
 def display_reconstructed_images(reconstructed_image, columns = 2, mode = "lowpass"):
