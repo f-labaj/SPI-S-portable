@@ -18,78 +18,6 @@ import matplotlib.pyplot as plt
 
 # connectivity
 import owon_get_data as owon
-## remember about python version differences, between remote 2.7 and local 3.9
-import zmq
-
-# zmq parameters
-port = "5556"
-
-# zmq communication functions
-
-# socket.send_string("Server message")
-# msg = socket.recv()
-# print(msg)
-# time.sleep(1)
-
-
-####
-# PUSH COMMUNICATION FUNCTIONS TO A SEPARATE FILE/MODULE!
-####
-# Perhaps integrate all below zmq functions into one simple messenger
-def check_connection(socket):
-    # check if hexes are supported by zmq
-    socket.send(0x00)
-    answer = socket.recv()
-    
-    if answer == 1:
-        return True
-        
-    else:
-        print("No connection!")
-        # do something else, update GUI etc.
-        # block later control functions from executing
-        return False
-    
-def check_patterns_exist(socket):
-    socket.send(0x01)
-    answer = socket.recv()
-    
-    if answer == 1:
-        return True
-        
-    elif answer == 0:
-        print("No patterns!")
-        # do something else, update GUI etc.
-        # block later control functions from executing
-        return False
-        
-    else:
-        print("Error checking for patterns!")
-
-def send_patterns(socket, pattern_list):
-    socket.send(0x02)
-    answer = socket.recv()
-    
-    if answer == 1:
-        # scp called from bash/cmd OR usb OR zmq file transfer?
-        for pattern in pattern_list:
-            tracker = socket.send(pattern, copy = True)
-            if tracker is True:
-                print("1 pattern sent!")
-            else:
-                print("Error sending pattern!")               
-    
-def display_next_pattern(socket):
-    socket.send(0x10)
-    answer = socket.recv()
-    
-    if answer == 1:
-        pass
-    
-    elif answer == 2:
-        print("Error displaying pattern!")
-        
-##########################
 
 # directory locations
 ground_truths_directory = "./GT/"
@@ -319,11 +247,19 @@ while True:
 	
 	BBB_layout = [
 		[
-			sg.Button("Start SPI!", key="-START_SPI-"),
+			sg.Button("Send and display patterns", key="-SEND_AND_DISPLAY_PATTERNS-"),
 		],
 		
 		[
-			sg.Text("Framerate:", size =(10, 1)), sg.InputText(size=(8, 1), key="-FRAMERATE-"),
+			sg.Text("Display framerate (without trigger):", size =(25, 1)), sg.InputText(size=(8, 1), key="-FRAMERATE-"),
+		],
+		
+		[
+			sg.Checkbox("Use trigger to display patterns", default=False, disabled=False, key="-TRIGGER_MODE-"),
+		],
+		
+		[
+			sg.Button("Trigger", key="-TRIGGER-"),
 		],
 	]
 
@@ -333,6 +269,9 @@ while True:
     #print(values)
     #print(event)
     #print(image)
+	
+	# init intensity vector that will store data from the oscilloscope
+	intensity_vector = []
     
 	# Exit event
 	if event == "Exit" or event == sg.WIN_CLOSED:
@@ -508,6 +447,10 @@ while True:
 		
 		# ssh client from paramiko
 		client = None
+		
+		# oscilloscope variable
+		osc_device = None
+		
 		remote_window.FindElement("-BEAGLE_STATUS-").Update(False)
 		
 		while True:
@@ -531,9 +474,8 @@ while True:
 			if remote_event == "-BEAGLE_CONNECT-":
 				# ALTERNATIVE COMMS: USB or ZMQ
 				if remote_values["-BEAGLE_COMMS_USB-"] is True: 
-					pass
-					
 					# TODO
+					pass
 					
 				# Paramiko/SSH COMMS
 				elif remote_values["-BEAGLE_COMMS_USB-"] is False:
@@ -545,131 +487,114 @@ while True:
 						else:
 							print("No password provided!")
 					
-					# temp debug - proper is != None
+					# if connected to BBB
 					if client != None:
 						print("Connected!")
 						remote_window.FindElement("-BEAGLE_STATUS-").Update(True)
 						
-						# TODO - check if needed for display, perhaps sudo will be sufficient
-						
-						#print("Logging in as root...")
-						
-						#stdin, stdout, stderr = client.exec_command('sudo -S su')
-						#time.sleep(0.5)
-						#stdin.write(remote_values["-PASSWORD-"])
-						#stdin.flush()
-
-						# TODO - check if the client is indeed in su
-						
-						#print("Root credentials sent!")
-						
-						# DEBUG
-						#output = aux.execute_remote_command(client, 'id -u')
-						# get outputs and errors
-						#print(output[1].readlines())
-						#print(output[2].readlines())
-						
-						#if output[]
-
-						# TODO - add structured commands that can be used through the GUI
+						patterns_on_BBB = False
 						
 						BBB_window = sg.Window("BBB Control", BBB_layout, finalize=True)
 						
 						while True:
 							BBB_event, BBB_values = BBB_window.read()
 							
+							trigger_mode = BBB_values["-TRIGGER_MODE-"]
+							
 							if BBB_event == "Exit" or BBB_event == sg.WIN_CLOSED:
 								break
-								
-							elif BBB_event == "-START_SPI-":
+							
+							elif BBB_event == "-SEND_AND_DISPLAY_PATTERNS-":
+								# check if there already are patterns on the BBB
+								#output = aux.execute_remote_command(client, 'find /home/debian/Desktop/DLP_Control/structured_light;./pattern_disp -i')
 							
 								# TODO - add loop that will display all patterns in subsets
-							
+								
+								pattern_list = os.listdir(patterns_directory)
+								
 								# if there are files in the pattern directory
-								if len(os.listdir(patterns_directory)) != 0:
+								if len(pattern_list) != 0:
+									# pattern starting number
+									p_num = 0
+									# pattern batch size - amount of patterns that will be sent to BBB
+									# Check if it works for small pattern sets
+									p_batch_size = 10
 									
-									#for pattern_num in range(1, len(os.listdir(patterns_directory)))
-								
-								
-								
-									# organize patterns, select which are to be uploaded
-									# TODO - add logic that selects the most important patterns, using fourier domain filters!
-									# 	- using filenames is the best way, probably
-									
-									partial_pattern_dir_list = []
-									points_list = []
-									
-									# select range that will be used
-									# TODO - add selection from GUI level
-									#for a in range(0, int(resolution*scale / 18)):
-									#	for b in range(0, int(resolution*scale / 18)):
-									#		points_list.append(a*b)
-									
-									for a in range(1, 10):
-										for b in range(1, 10):
-											# TODO - check if multiplication is correct here
-											points_list.append(a*b)
-									
+									# while the pattern number p_num has not surpassed the pattern amount
+									while p_num < len(os.listdir(patterns_directory)):
+										partial_pattern_dir_list = []
+										
+										# select patterns that match numbers that are currently sent/measured
+										# iterates over all images - might be slow!
+										# alternative - explicitly select images via their numbers
+										for image in pattern_list:
+											if p_num <= int(image[8:11][0]) < p_num + p_batch_size:
+												partial_pattern_dir_list.append(image)
+										
+										# DEBUG
+										print("Currently batched patterns:\n")
+										print(partial_pattern_dir_list)
+										
+										# open sftp client on existing connection
+										ftp_client = client.open_sftp()
+										if ftp_client != None:
+											print("SFTP connection opened!")
+										
+										# transfer selected patterns to BBB
+										temp_number = 0
+										for pattern_name in partial_pattern_dir_list:
+											print("Uploading pattern: " + pattern_name)
+											ftp_client.put("./PATTERNS/" + pattern_name, "/home/debian/Desktop/DLP_Control/structured_light/" + temp_number)
+											temp_number += 1
+											
+										# close client after transfer
+										ftp_client.close()
+											
+										print("Pattern subset sent!")
+										
+										# move on to next pattern set
+										p_num += p_batch_size
+										
+										# TODO
+										# display patterns, according to mode
+										if trigger_mode is True:
+											output = aux.execute_remote_command(client, 'cd /home/debian/Desktop/DLP_Control/structured_light;./pattern_disp -i')
+											
+											# trigger the display of concurrent patterns
+											for remote_p_num in range(0, p_batch_size):
+												# get intensity data from single-pixel detector->oscilloscope
+												intensity_vector.append(owon.get_data(osc_device, 1))
+												
+												# software trigger
+												output = aux.execute_remote_command(client, 'printf 1 > /sys/class/gpio/gpio119/value')
+											
+										else:
+											output = aux.execute_remote_command(client, 'cd /home/debian/Desktop/DLP_Control/structured_light;./pattern_disp -k ' + BBB_values["-FRAMERATE-"])
+											
 									# DEBUG
-									print("Selected points:\n")
-									print(points_list)
+									print("Pomiar: \n")
+									print(intensity_vector)
 									
-									# select images with numbers that are in points_list
-									for image in os.listdir(patterns_directory):
-										if int(image[8:11][0]) in points_list:
-											partial_pattern_dir_list.append(image)
-								
-									# open sftp client on existing connection
-									# TODO - check if it works on a single ssh connection!
-									ftp_client = client.open_sftp()
-									if ftp_client != None:
-										print("SFTP connection opened!")
-									
-									# transfer selected patterns to BBB
-									# TODO - select patterns on remote
-									# TODO - check if file locations work on PC and BBB
-									for pattern_name in partial_pattern_dir_list:
-										print("Loading pattern: " + pattern_name)
-										ftp_client.put("./PATTERNS/" + pattern_name, "/home/debian/Desktop/DLP_Control/structured_light/" + pattern_name)
-										
-									# close client after transfer
-									ftp_client.close()
-										
-									print("Pattern subset sent!")
-										
-								# Display patterns with trigger
-								# 
-								
-								# TODO - not displaying, check root
-
-								#output = aux.execute_remote_command(client, 'cd /home/debian/Desktop/DLP_Control/structured_light/;sudo -S ./pattern_disp -k ' + BBB_values["-FRAMERATE-"])
-								output = aux.execute_remote_command(client, 'cd /home/debian/Desktop/DLP_Control/structured_light;./pattern_disp -k ' + BBB_values["-FRAMERATE-"])
-								
-								# get outputs and errors
-								print(output[1].readlines())
-								print(output[2].readlines())
-								
-								# TODO - check if correct, currently deletes whole folder!
-								# clean patterns (all files that are .bmp) from memory in preparation for another subset
-								#output = aux.execute_remote_command(client, "find /home/debian/Desktop/DLP_Control/structured_light '*.bmp' -exec rm {} \;" + BBB_values["-FRAMERATE-"])
-								# get errors
-								#print(output[2].readlines())
-								
-								# Alternative pattern cleaning solution:
-								# TODO - check if it works on BBB when executed remotely
-								#output = aux.execute_remote_command(client, 'python /home/debian/Desktop/DLP_Control/structured_light/clean_patterns.py')
-								
+								else:
+									print("No patterns to send in directory!")
+					else:
+						print("No connection to BBB!")
+						
+			# placeholder
 			# connect to DLP_EVM for DMD modulation
 			elif remote_event == "-DLP_EVM_CONNECT-":
 				# TODO
 				pass
 			
+			# TODO
 			# connect to oscilloscope for measurement vector acquisition
 			elif remote_event == "-OSC_CONNECT-":
 				# TODO
 				# initial connection
 				# check if it's possible to see if it is connected (osc_device != None ???)
 				osc_device = owon.connect()
+				if osc_device is not None:
+					print("Connected to oscilloscope!")
 				pass
 				
 # clean up after the program

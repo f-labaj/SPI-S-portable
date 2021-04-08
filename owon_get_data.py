@@ -30,6 +30,9 @@ def get_id(dev):
     return send(dev, '*IDN?').tobytes().decode('utf-8')
 
 def get_data(dev, ch):
+	# TODO - change to peak measurement
+	
+	
     # first 4 bytes indicate the number of data bytes following
     rawdata = send(dev, ':DATA:WAVE:SCREen:CH{}?'.format(ch))
     data = []
