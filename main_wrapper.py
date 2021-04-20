@@ -17,7 +17,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # connectivity
-import owon_get_data as owon
+#import owon_get_data as owon
+
+import arduino_control as arcon
+
+dev = None
 
 # directory locations
 ground_truths_directory = "./GT/"
@@ -213,7 +217,7 @@ while True:
 		],
 		
 		[
-			sg.Button("Connect to Oscilloscope", key="-OSC_CONNECT-"),
+			sg.Button("Connect to Arduino", key="-ARD_CONNECT-"),
 		],
 		
 		[
@@ -221,7 +225,7 @@ while True:
 		],
 		
 		[
-			sg.Checkbox("Connection status: ", default=False, disabled=True, key="-OSC_STATUS-"),
+			sg.Checkbox("Connection status: ", default=False, disabled=True, key="-ARD_STATUS-"),
 		],
 			
 		[
@@ -452,8 +456,9 @@ while True:
 		# ssh client from paramiko
 		client = None
 		
-		# oscilloscope variable
-		osc_device = None
+		# arduino variable
+		# declared in the begininng to allow serial connection closing outside of loop
+		#dev = None
 		
 		remote_window.FindElement("-BEAGLE_STATUS-").Update(False)
 		
@@ -485,6 +490,7 @@ while True:
 				elif remote_values["-BEAGLE_COMMS_USB-"] is False:
 					if remote_values["-BEAGLE_STATUS-"] is False:
 						if remote_values["-PASSWORD-"] is not '':
+							# closing the client after each command might fix some further issues
 							client = aux.connect_ssh(remote_values["-PASSWORD-"])
 							print("Starting connection...")
 						
@@ -506,7 +512,11 @@ while True:
 							BBB_event, BBB_values = BBB_window.read()
 							
 							# returns NoneType, need to check for issues
-							trigger_mode = BBB_values["-TRIGGER_MODE-"]
+							# temporary workaround with try/except
+							try:
+								trigger_mode = BBB_values["-TRIGGER_MODE-"]
+							except TypeError:
+								print("Trigger object error omitted...")
 							
 							if BBB_event == "Exit" or BBB_event == sg.WIN_CLOSED:
 								break
@@ -576,26 +586,37 @@ while True:
 										# display patterns, according to mode
 										if trigger_mode is True:
 											output = aux.execute_remote_command(client, 'cd /home/debian/Desktop/DLP_Control/structured_light;./pattern_disp -i')
+											
+											# COMMENT OUT FOR DEBUG - The program hangs on readlines() - check!
+											# if commented, the ssh client hangs and ftp_client.close() returns Administratively Prohibited error
 											print(output[1].readlines())
 											print(output[2].readlines())
 											
 											# trigger the display of concurrent patterns
 											for remote_p_num in range(0, p_batch_size):
-												# get intensity data from single-pixel detector->oscilloscope
-												
-												# DEBUG - commented out for debug
-												#intensity_vector.append(owon.get_data(osc_device, 1))
+												if remote_values["-ARD_STATUS-"] is True:
+													# get intensity data from single-pixel detector->arduino ADC
+													intensity_vector.append(arcon.get_value(dev))
+												else:
+													print("Arduino not connected!")
 												
 												# DEBUG
 												time.sleep(0.5)
 												
 												# software trigger
 												# GPIO115 is trigger in, as declared in .c files on BBB
-												output = aux.execute_remote_command(client, 'printf 1 > /sys/class/gpio/gpio115/value')
+												# printf write error operation not permitted - ERROR!
+												
+												# echo taken from:
+												# https://developer.toradex.com/knowledge-base/gpio-linux#To_directly_force_a_GPIO_to_output_and_set_its_initial_value_eg_glitchfree_operation
+												output = aux.execute_remote_command(client, 'echo high > /sys/class/gpio/gpio115/direction')
 												print(output[1].readlines())
 												print(output[2].readlines())
 											
 												print("Trigger set to HIGH!")
+												
+												# DEBUG
+												time.sleep(0.5)
 											
 										else:
 											output = aux.execute_remote_command(client, 'cd /home/debian/Desktop/DLP_Control/structured_light;./pattern_disp -k ' + BBB_values["-FRAMERATE-"])
@@ -622,14 +643,23 @@ while True:
 			
 			# TODO
 			# connect to oscilloscope for measurement vector acquisition
-			elif remote_event == "-OSC_CONNECT-":
+			elif remote_event == "-ARD_CONNECT-":
 				# TODO
 				# initial connection
 				# check if it's possible to see if it is connected (osc_device != None ???)
-				osc_device = owon.connect()
-				if osc_device is not None:
-					print("Connected to oscilloscope!")
-				pass
+				#osc_device = owon.connect()
+				#if osc_device is not None:
+				#	print("Connected to oscilloscope!")
+				#pass
+				
+				dev = arcon.init_serial()
+				if dev != None:
+					print("Arduino connected!")
+					remote_window.FindElement("-ARD_STATUS-").Update(True)
+					
+				
+# disconnect arduino - TODO - change to button inside menu
+arcon.close_serial(dev)
 				
 # clean up after the program
 main_window.close()
