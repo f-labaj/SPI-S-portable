@@ -23,7 +23,8 @@ void loop() {
     Serial.write(b1);
     delay(100);
     Serial.write(b2);
-    
+
+    Serial.println(meas);
     //Serial.println(b1);
     //Serial.println('\n');
     //Serial.println(b2);

@@ -63,6 +63,8 @@ main_control_column = [
     [
         sg.Button("Reconstruct", key="-RECONSTRUCT-", disabled=True),
         sg.VSeparator(),
+        sg.Button("Reconstruct/Real", key="-RECONSTRUCT_REAL-", disabled=False),
+        sg.VSeparator(),
         sg.Button("Generate patterns", key="-GENERATE_PATTERNS-"),
         sg.VSeparator(),
         sg.Button("Export patterns", key="-EXPORT_PATTERNS-"),
@@ -282,7 +284,7 @@ while True:
     #print(event)
     #print(image)
     
-    # init intensity vector that will store data from the oscilloscope
+    # init intensity vector that will store data from the Arduino
     intensity_vector = []
     
     # Exit event
@@ -315,6 +317,27 @@ while True:
             else:
                 print("Pattern size is different from the selected resolution!")
                 main_window.FindElement("-STATUS-").Update("Reconstruction error - wrong pattern size!")
+    
+    elif event == "-RECONSTRUCT_REAL-":
+        # DEBUG when commented
+        #if len(intensity_vector) < 1:
+        #    print("No measurements!")
+        #    main_window.FindElement("-STATUS-").Update("No measurements!")
+    
+        else:
+            print("Starting reconstruction...")
+            main_window.FindElement("-STATUS-").Update("Starting reconstruction...")
+            
+            reconstructed_image, fourier_spectrum_2D_padded = fourier.reconstruct_image(resolution, scale, intensity_vector, "lowpass")
+
+            print("Reconstruction done.")
+            main_window.FindElement("-STATUS-").Update("Reconstruction done.")
+                
+            # DEBUG Fourier plane
+            aux.save_image(np.real(fourier_spectrum_2D_padded), "fourier_padded", "")
+                
+            #aux.save_image(gallery_directory, reconstructed_image, "rec_img")
+            aux.show_images([image, image_resized, np.real(fourier_spectrum_2D_padded), np.real(reconstructed_image)], 1)
             
     elif event == "-GENERATE_PATTERNS-":
             
@@ -459,6 +482,7 @@ while True:
         
         # ssh client from paramiko
         client = None
+        sub_client = None
         
         # arduino variable
         # declared in the begininng to allow serial connection closing outside of loop
@@ -480,6 +504,8 @@ while True:
                 #if remote_values["-BEAGLE_STATUS-"] is True and client != None:
                 
                 if client is not None:
+                    aux.close_ssh(client)
+                if sub_client is not None:
                     aux.close_ssh(client)
                 break
                 
@@ -541,13 +567,13 @@ while True:
                                     # Check if it works for small pattern sets
                                     p_batch_size = int(BBB_values["-PATTERN_BATCH_SIZE-"])
                                     
-                                    # open sftp client on existing connection
-                                    ftp_client = client.open_sftp()
-                                    if ftp_client != None:
-                                        print("SFTP connection opened!")
-                                    
                                     # while the pattern number p_num has not surpassed the pattern amount
                                     while p_num < len(os.listdir(patterns_directory)):
+                                        # open sftp client on existing connection
+                                        ftp_client = client.open_sftp()
+                                        if ftp_client != None:
+                                            print("SFTP connection opened!")
+                                    
                                         partial_pattern_dir_list = []
                                         
                                         # select patterns that match numbers that are currently sent/measured
@@ -568,8 +594,9 @@ while True:
                                                     partial_pattern_dir_list.append(image)
                                         
                                         # DEBUG
-                                        print("Currently batched patterns:\n")
+                                        print("Currently batched patterns:")
                                         print(partial_pattern_dir_list)
+                                        print("\n")
                                         
                                         # transfer selected patterns to BBB
                                         
@@ -582,57 +609,82 @@ while True:
                                             temp_number += 1
                                             
                                         print("Pattern subset sent!")
-                                        
+                                    
+                                        # close client after transfer
+                                        ftp_client.close()
+                                    
                                         # move on to next pattern set
                                         p_num += p_batch_size
                                         
                                         # TODO
                                         # display patterns, according to mode
                                         if trigger_mode is True:
-                                            output = aux.execute_remote_command(client, 'cd /home/debian/Desktop/DLP_Control/structured_light;./pattern_disp -i')
+                                            sub_client = aux.connect_ssh(remote_values["-PASSWORD-"])
+                                            
+                                            if sub_client is not None:
+                                                print("GPIO subclient connected!")
+                                            
+                                            # BBB lags after a few iterations -> the ./pattern_disp process does not close properly! - check C++ code.
+                                            
+                                            output = aux.execute_remote_command(client, 'cd /home/debian/Desktop/DLP_Control/structured_light && ./pattern_disp -i')
                                             
                                             # COMMENT OUT FOR DEBUG - The program hangs on readlines() - check!
                                             # if commented, the ssh client hangs and ftp_client.close() returns Administratively Prohibited error
-                                            print(output[1].readlines())
-                                            print(output[2].readlines())
+                                            #print(output[1].readlines())
+                                            #print(output[2].readlines())
+                                            
+                                            print("Starting triggered display...")
+                                            
+                                            # BUG - the last pattern is not triggered and the process doesn't close - check loop arguments! -> added TEMPORARY +1 to loops, check if it works!
+                                            # BUG - tearing of some patterns - check if its CPU or code related!
+                                            # BUG - 
                                             
                                             # trigger the display of concurrent patterns
-                                            for remote_p_num in range(0, p_batch_size):
-                                                if remote_values["-ARD_STATUS-"] is True:
-                                                    # get intensity data from single-pixel detector->arduino ADC
-                                                    intensity_vector.append(arcon.get_value(dev))
-                                                else:
-                                                    print("Arduino not connected!")
-                                                
+                                            for remote_p_num in range(0, p_batch_size*3):
+
                                                 # DEBUG
-                                                time.sleep(0.5)
+                                                #time.sleep(0.5)
                                                 
                                                 # software trigger
                                                 # GPIO115 is trigger in, as declared in .c files on BBB
                                                 # printf write error operation not permitted - ERROR!
                                                 
+                                                # The command below shows all patterns after setting trigger to high!
+                                                # check if the trigger is edge or not, set proper delaying
+                                                
                                                 # echo taken from:
                                                 # https://developer.toradex.com/knowledge-base/gpio-linux#To_directly_force_a_GPIO_to_output_and_set_its_initial_value_eg_glitchfree_operation
-                                                output = aux.execute_remote_command(client, 'echo high > /sys/class/gpio/gpio115/direction')
+                                                output = aux.execute_remote_command(sub_client, 'echo high > /sys/class/gpio/gpio115/direction && sleep .1 && echo low > /sys/class/gpio/gpio115/direction')
                                                 print(output[1].readlines())
                                                 print(output[2].readlines())
-                                            
-                                                print("Trigger set to HIGH!")
+
+                                                if remote_values["-ARD_STATUS-"] is True:
+                                                    # get intensity data from single-pixel detector->arduino ADC
+                                                    intensity_vector.append(arcon.get_value(dev))
+                                                else:
+                                                    print("Arduino not connected!")
+                                                    
+                                                print(intensity_vector[-1])
                                                 
-                                                # DEBUG
-                                                time.sleep(0.5)
+                                                time.sleep(0.2)
+                                            
+                                            # remove all images from dir
+                                            output = aux.execute_remote_command(sub_client, 'cd /home/debian/Desktop/DLP_Control/structured_light && rm *.bmp')
+                                            print(output[1].readlines())
+                                            print(output[2].readlines())
+                                                
+                                            aux.close_ssh(sub_client)
                                             
                                         else:
-                                            output = aux.execute_remote_command(client, 'cd /home/debian/Desktop/DLP_Control/structured_light;./pattern_disp -k ' + BBB_values["-FRAMERATE-"])
+                                            output = aux.execute_remote_command(client, 'cd /home/debian/Desktop/DLP_Control/structured_light && ./pattern_disp -k ' + BBB_values["-FRAMERATE-"])
                                             print(output[1].readlines())
                                             print(output[2].readlines())
                                             
-                                    # close client after transfer
-                                    ftp_client.close()
-                                    
                                     # DEBUG
                                     print("Pomiar: \n")
                                     print(intensity_vector)
+                                    
+                                    
                                     
                                 else:
                                     print("No patterns to send in directory!")
@@ -658,9 +710,9 @@ while True:
                 
                 arduino_port = remote_values["-ARD_PORT-"]
                 
-                # if not filled, default to COM3
+                # if not filled, default to COM7
                 if arduino_port is None:
-                    arduino_port = 'COM3'
+                    arduino_port = 'COM7'
                 
                 dev = arcon.init_serial(arduino_port, 9600, 0)
                 if dev != None:
