@@ -25,9 +25,9 @@ def init_serial(port_num, speed, tout):
     except:
         print("Could not connect to Arduino! Check if it's plugged in / COM port number.")
 
-def get_value(ser):
+def get_value(ser, command):
     try:	
-        ser.write(b't')
+        ser.write(command)
         
         time.sleep(0.5)
         
