@@ -17,7 +17,7 @@ void loop() {
   delay(100);
   
   if(value == 'n') {
-    meas = 1023 - analogRead(analogPin);
+    meas = analogRead(analogPin);
 
     b1 = meas&0xFF;
     b2 = ( meas >> 8 ) & 0xFF;
@@ -36,7 +36,7 @@ void loop() {
   // from https://forum.arduino.cc/t/calculating-average-of-analog-read-values/427104
   else if(value == 'a') {
       for (int n=0; n<avg_num; n++) {
-        meas = ((1023 - meas) * n-1 + analogRead(analogPin)) / n ;
+        meas = ((meas) * n-1 + analogRead(analogPin)) / n ;
       }
 
       b1 = meas&0xFF;
@@ -50,6 +50,6 @@ void loop() {
 
   // placeholder for other detector types
   else if(value == 'c') {
-    delay(100)  
+    delay(100);  
   }
 }
