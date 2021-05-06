@@ -82,6 +82,10 @@ main_control_column = [
 	],
 	
 	[
+		sg.Text("Normalization mode: ", size =(10, 1)), sg.InputText(size=(3, 1), key="-NORM_MODE-"),
+	],
+	
+	[
 		sg.Checkbox("Hadamard method", key="-HADAMARD-", default=False),
 	],
 	
@@ -264,7 +268,7 @@ while True:
 			main_window.FindElement("-STATUS-").Update("Starting reconstruction...")
 			
 			if patterns[0][0].size == image_resized.size:
-				reconstructed_image, fourier_spectrum_2D_padded = fourier.reconstruct_image(resolution, scale, fourier.calculate_fourier_coeffs(fourier.mask_image(image_resized, patterns)), "lowpass")
+				reconstructed_image, fourier_spectrum_2D_padded = fourier.reconstruct_image(resolution, scale, fourier.calculate_fourier_coeffs(fourier.mask_image(image_resized, patterns)), "lowpass", 0)
 				
 				print("Reconstruction done.")
 				main_window.FindElement("-STATUS-").Update("Reconstruction done.")
@@ -289,13 +293,15 @@ while True:
 			print("Starting reconstruction...")
 			main_window.FindElement("-STATUS-").Update("Starting reconstruction...")
 			
-			reconstructed_image, fourier_spectrum_2D_padded = fourier.reconstruct_image(resolution, scale, intensity_coeff_list, "real")
+			norm_mode = int(values["-NORM_MODE"])
+			
+			reconstructed_image, fourier_spectrum_2D_padded = fourier.reconstruct_image(resolution, scale, intensity_coeff_list, "real", norm_mode)
 
 			print("Reconstruction done.")
 			main_window.FindElement("-STATUS-").Update("Reconstruction done.")
 				
 			# DEBUG Fourier plane
-			aux.save_image(np.real(fourier_spectrum_2D_padded), "fourier_padded", "")
+			aux.save_image(np.real(fourier_spectrum_2D_padded), "./GALLERY/fourier_padded", "")
 				
 			#aux.save_image(gallery_directory, reconstructed_image, "rec_img")
 			aux.show_images([image, np.real(fourier_spectrum_2D_padded), np.real(reconstructed_image)], 1)

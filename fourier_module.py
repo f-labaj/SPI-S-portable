@@ -254,13 +254,30 @@ def calculate_fourier_coeffs(masked_image_list):
 
 	return fourier_coeff_list
 	
-def reconstruct_image(resolution, scaling, fourier_coeff_list, mode):
+def reconstruct_image(resolution, scaling, fourier_coeff_list, mode, norm_mode):
 	start = time.time()
 	
 	N = resolution
 	M = int(1/scaling)
 	
-	fourier_spectrum = np.array(fourier_coeff_list)
+	list_raw = fourier_coeff_list
+	list_norm = []
+	
+	# normalize list of measurements
+	# https://stackoverflow.com/questions/26785354/normalizing-a-list-of-numbers-in-python
+	# for sum
+	if norm_mode is 1:
+		list_norm = [float(i)/sum(list_raw) for i in list_raw]
+	
+	# for maximum
+	elif norm_mode is 2:
+		list_norm = [float(i)/max(list_raw) for i in list_raw]
+			
+	# no normalization
+	elif norm_mode is 0:
+		list_norm = list_raw
+	
+	fourier_spectrum = np.array(list_norm)
 	
 	fourier_spectrum_2D = np.zeros((N,N))
 	fourier_spectrum_2D_padded = np.zeros((N,N))
@@ -275,7 +292,7 @@ def reconstruct_image(resolution, scaling, fourier_coeff_list, mode):
 		fourier_spectrum_2D_padded[0:fourier_spectrum_2D.shape[0], 0:fourier_spectrum_2D.shape[1]] = fourier_spectrum_2D
 		
 		#DEBUG
-		aux.save_image(np.real(fourier_spectrum_2D), "fourier_unpadded", "")
+		aux.save_image(np.real(fourier_spectrum_2D), "./GALLERY/fourier_unpadded", "")
 		
 		# # Reshape spectrum to correct quadrant form
 		# coord = len(fourier_spectrum_2D_padded) // 2
@@ -305,7 +322,7 @@ def reconstruct_image(resolution, scaling, fourier_coeff_list, mode):
 		fourier_spectrum_2D_padded = np.zeros((N, N), dtype=complex)
 		fourier_spectrum_2D_padded[0:fourier_spectrum_2D.shape[0], 0:fourier_spectrum_2D.shape[1]] = fourier_spectrum_2D
 		
-		aux.save_image(np.real(fourier_spectrum_2D), "fourier_unpadded", "")
+		aux.save_image(np.real(fourier_spectrum_2D), "./GALLERY/fourier_unpadded", "")
 		
 	elif mode is "midpass_alt":
 		fourier_spectrum_2D = np.reshape(fourier_spectrum, (int(N/M), int(N/M)))
@@ -333,7 +350,7 @@ def reconstruct_image(resolution, scaling, fourier_coeff_list, mode):
 	
 	print("\nReconstruction time: " + str(float(end-start)) + "s\n")
 	
-	aux.save_image(np.real(reconstructed_image), "image_unpadded", "")
+	aux.save_image(np.real(reconstructed_image), "./GALLERY/image_unpadded", "")
 	
 	return (reconstructed_image, fourier_spectrum_2D_padded)
 	
