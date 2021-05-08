@@ -2,6 +2,8 @@ int analogPin = 1;
 int command = 0;
 int value = 0;
 int meas = 0;
+int sample_num = 0;
+int temp_meas = 0;
 
 byte b1, b2;
 
@@ -46,7 +48,28 @@ void loop() {
       delay(100);
       Serial.write(b2);
       delay(100);
+
+      meas = 0;
   }
+
+  else if(value == 'x') {
+      for int (n=0; n<sample_num; n++) {
+          temp = analogRead();
+          if(temp > meas){
+            meas = temp;
+          }
+      }
+
+      b1 = meas&0xFF;
+      b2 = ( meas >> 8 ) & 0xFF;
+  
+      Serial.write(b1);
+      delay(100);
+      Serial.write(b2);
+      delay(100);
+
+      meas = 0;
+    }
 
   // placeholder for other detector types
   else if(value == 'c') {

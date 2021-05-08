@@ -322,7 +322,7 @@ def reconstruct_image(resolution, scaling, fourier_coeff_list, mode, norm_mode):
 		fourier_spectrum_2D_padded = np.zeros((N, N), dtype=complex)
 		fourier_spectrum_2D_padded[0:fourier_spectrum_2D.shape[0], 0:fourier_spectrum_2D.shape[1]] = fourier_spectrum_2D
 		
-		aux.save_image(np.real(fourier_spectrum_2D), "./GALLERY/fourier_unpadded", "")
+		aux.save_image_complex(np.real(fourier_spectrum_2D), "./GALLERY/fourier_unpadded", "")
 		
 	elif mode is "midpass_alt":
 		fourier_spectrum_2D = np.reshape(fourier_spectrum, (int(N/M), int(N/M)))
@@ -350,7 +350,7 @@ def reconstruct_image(resolution, scaling, fourier_coeff_list, mode, norm_mode):
 	
 	print("\nReconstruction time: " + str(float(end-start)) + "s\n")
 	
-	aux.save_image(np.real(reconstructed_image), "./GALLERY/image_unpadded", "")
+	aux.save_image_complex(np.real(reconstructed_image), "./GALLERY/image_unpadded", "")
 	
 	return (reconstructed_image, fourier_spectrum_2D_padded)
 	

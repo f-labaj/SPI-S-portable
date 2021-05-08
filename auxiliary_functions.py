@@ -167,6 +167,11 @@ def save_image(image, img_name, directory):
 	img_24 = img.convert("RGB")
 	img_24.save(str(directory) + str(img_name) + '.bmp')
 
+def save_image_complex(image, img_name, directory):
+    rescaled = (255.0 / image.max() * (image - image.min())).astype(np.uint8)
+    img = Image.fromarray(rescaled)
+    img.save(str(directory) + str(img_name) + '.png')
+
 def load_image(filename):
 	image = io.imread(filename)
 	
