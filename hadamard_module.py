@@ -57,6 +57,7 @@ def generate_patterns(resolution):
         mask_pos = mask_full.copy()
         mask_neg = mask_full.copy()
         
+		# threshold from (-1, 0, 1) to (0, 1)
         mask_pos[mask_pos<0] = 0
         mask_pos[mask_pos>0] = 1
         mask_neg[mask_neg>0] = 0
@@ -71,12 +72,31 @@ def mask_image():
     for mask_pair in mask_list:
         masked_image_list.append([image_gray*mask_pair[0], image_gray*mask_pair[1]])
     
+	
+	
 def calculate_intensity_vector():
     intensity_vector = []
     intensity_vector.append(np.sum(image_gray*mask_pair[0])-np.sum(image_gray*mask_pair[1]))
     
-def reconstruct_image():
-    pass
+	
+# reconstruct the image based on a simulated or measured vector of intensity values
+def reconstruct_image(intensity_vector, N, mode):
+	if mode == 'real':
+		# check if our measured vector has the correct size
+		while !aux.is_square(len(intensity_vector)):
+			# remove last element of the list, loop will exit if it has a real root
+			intensity_vector.pop()
+		
+		result_pre = hadamard_matrix.dot(intensity_vector)
+		result_final = np.reshape(result_pre, (N,N))
+		result_final *= (1.0/result_final.max())
+	
+	elif mode == 'simulation':
+		result_pre = hadamard_matrix.dot(intensity_vector)
+		result_final = np.reshape(result_pre, (N,N))
+		result_final *= (1.0/result_final.max())
+		
+	return result_final
 
 # end1 = time.time()
 

@@ -16,6 +16,13 @@ from PIL import Image
 
 import paramiko
 
+import math
+
+# https://stackoverflow.com/questions/2489435/check-if-a-number-is-a-perfect-square
+def is_square(integer):
+    root = math.sqrt(integer)
+    return integer == int(root + 0.5) ** 2
+
 def connect_ssh(password):
 	host = "192.168.7.2"
 	port = 22
@@ -99,44 +106,15 @@ def save_list_of_lists(list_of_lists, directory, export_mode, resolution):
 	else:
 		print("Export mode error!")
 
-	# # save as .npy for efficient binary IO
-	# if mode == 1:
-		# i = 0
-		# for lst in list_of_lists:
-			# j = 0
-			# for el in lst:
-				# save(directory + 'name_' + str(i) + '_' + str(j) + '.npy', el, allow_pickle=False)
-				# j += 1
-			# i += 1
-		
-		# print("Done saving patterns!")
-		
-	# # Currently not usable
-	# # save as .png for viewing
-	# elif mode == 2:
-		# i = 0
-		# for lst in list_of_lists:
-			# j = 0
-			# for el in lst:
-				# save(directory + 'name_' + str(i) + '_' + str(j) + '.png', el, allow_pickle=False)
-				# j += 1
-			# i += 1
-		   
-		# print("Done saving patterns!")   
-		   
-	# # save as .png in 1920x1080 for DMD display
-	# elif mode == 3:
-		# i = 0
-		# for lst in list_of_lists:
-			# j = 0
-			# for el in lst:
-				# Image.fromarray(np.resize(el, (1280,1280))).save(directory + 'dmd_name_' + str(i) + '_' + str(j) + '.png')
-				# j += 1
-			# i += 1
-		# print("Done saving patterns!")
-		
-	# else:
-		# print("Export mode error!")
+# https://stackoverflow.com/questions/6494102/how-to-save-and-load-an-array-of-complex-numbers-using-numpy-savetxt
+def save_measurements(meas, file):
+	# save the array as real (reinterpreted)
+	np.savetxt(file + '.txt', array.view(float))
+
+def load_measurements(file):
+	# load the array as complex 
+	meas_load = np.loadtxt(file + '.txt').view(complex)
+	return meas_load
 	
 # TODO mode
 def load_list_of_lists(directory, mode):
@@ -185,7 +163,8 @@ def resize_image(image, resolution):
 	
 	return image_resized
 
-# funkcja do wyświetlania wielu obrazów naraz
+# displays multiple images in one window
+# doesn't work for reconstructions of real world measurements, due to a type error!
 def show_images(images, cols = 2, titles = None):
 	"""Display a list of images in a single figure with matplotlib.
 	

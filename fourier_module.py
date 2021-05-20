@@ -11,6 +11,8 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 
+import gmpy
+
 # Image processing
 from PIL import Image
 
@@ -254,7 +256,7 @@ def calculate_fourier_coeffs(masked_image_list):
 
 	return fourier_coeff_list
 	
-def reconstruct_image(resolution, scaling, fourier_coeff_list, mode, norm_mode):
+def reconstruct_image(resolution, scaling, fourier_coeff_list, mode, norm_mode, meas_file):
 	start = time.time()
 	
 	N = resolution
@@ -310,10 +312,36 @@ def reconstruct_image(resolution, scaling, fourier_coeff_list, mode, norm_mode):
 		# aux.save_image(np.real(q3), "q3", "")
 		# aux.save_image(np.real(q4), "q4", "")
 	
+	# reconstruct from data saved to a file
+	# TODO
+	elif mode is "from_file":
+		# load measurements from save directory
+		fourier_coeff_list = aux.load_measurements(meas_file)
+		
+		# check if there is enough measurement points for reconstruction/the vector length has a root
+		# if not - change the length to fit, cutting out or adding some data
+		while !aux.is_square(len(fourier_coeff_list)):
+			# remove last element of the list, loop will exit if it has a real root
+			fourier_coeff_list.pop()
+			
+		fourier_spectrum_2D = np.reshape(fourier_spectrum, ((int(N/M)), (int(N/M))))
+		
+		fourier_spectrum_2D_padded = np.zeros((N, N), dtype=complex)
+		fourier_spectrum_2D_padded[0:fourier_spectrum_2D.shape[0], 0:fourier_spectrum_2D.shape[1]] = fourier_spectrum_2D
+		
+		aux.save_image_complex(np.real(fourier_spectrum_2D), "./GALLERY/fourier_unpadded", "")
+		aux.save_image_complex(np.real(fourier_spectrum_2D_padded), "./GALLERY/fourier_padded", "")
+	
 	# 'Real' mode based on measured intensity vector
 	elif mode is "real":
 		# check image sizes, prune unneeded/false measurements in main
-		N_pom = len(fourier_coeff_list)
+		#N_pom = len(fourier_coeff_list)
+		
+		# check if there is enough measurement points for reconstruction/the vector length has a root
+		# if not - change the length to fit, cutting out or adding some data
+		while !aux.is_square(len(fourier_coeff_list)):
+			# remove last element of the list, loop will exit if it has a real root
+			fourier_coeff_list.pop()
 		
 		# ERROR!! Check below
 		# returns ValueError for complex? list "ValueError: Non-string object detected for the array ordering. Please pass in 'C', 'F', 'A', or 'K' instead"
@@ -323,6 +351,7 @@ def reconstruct_image(resolution, scaling, fourier_coeff_list, mode, norm_mode):
 		fourier_spectrum_2D_padded[0:fourier_spectrum_2D.shape[0], 0:fourier_spectrum_2D.shape[1]] = fourier_spectrum_2D
 		
 		aux.save_image_complex(np.real(fourier_spectrum_2D), "./GALLERY/fourier_unpadded", "")
+		aux.save_image_complex(np.real(fourier_spectrum_2D_padded), "./GALLERY/fourier_padded", "")
 		
 	elif mode is "midpass_alt":
 		fourier_spectrum_2D = np.reshape(fourier_spectrum, (int(N/M), int(N/M)))
@@ -340,18 +369,23 @@ def reconstruct_image(resolution, scaling, fourier_coeff_list, mode, norm_mode):
 		#fourier_spectrum_2D_padded = np.zeros((N,N),dtype=complex)
 		#fourier_spectrum_2D_padded[m_x:fourier_spectrum_2D.shape[0], m_y:fourier_spectrum_2D.shape[1]] = fourier_spectrum_2D
 
-	if mode is "lowpass" or mode is "real":
-		reconstructed_image = fft.ifft2(fourier_spectrum_2D_padded)
-		
-	else:
-		reconstructed_image = fft.ifft2(fourier_spectrum_2D)
-
-	end = time.time()
+	#if mode is "lowpass" or mode is "real":
+	#	reconstructed_image = fft.ifft2(fourier_spectrum_2D_padded)
+	#	
+	#else:
+	#	reconstructed_image = fft.ifft2(fourier_spectrum_2D)
 	
+	# reconstruct both the padded and unpadded spectrum
+	reconstructed_image = fft.ifft2(fourier_spectrum_2D_padded)
+	reconstructed_image_unpadded = fft.ifft2(fourier_spectrum_2D)
+	
+	end = time.time()
 	print("\nReconstruction time: " + str(float(end-start)) + "s\n")
 	
+	# save reconstructions of the padded and unpadded spectrum:
+	aux.save_image_complex(np.real(reconstructed_image_unpadded), "./GALLERY/image_unpadded", "")
 	aux.save_image_complex(np.real(reconstructed_image), "./GALLERY/image_unpadded", "")
-	
+
 	return (reconstructed_image, fourier_spectrum_2D_padded)
 	
 # TODO -> pass original image etc.
@@ -381,5 +415,3 @@ def analyze_reconstruction_PSNR(ground_truth, reconstructed_image):
 def analyze_reconstruction_noise(ground_truth, reconstructed_image):
 	noise = ground_truth - reconstructed_image
 	# TODO!
-	
-	

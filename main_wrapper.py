@@ -20,7 +20,6 @@ import matplotlib.pyplot as plt
 #import owon_get_data as owon
 
 import arduino_control as arcon
-
 dev = None
 
 # directory locations
@@ -165,10 +164,11 @@ main_window.FindElement("-STATUS-").Update("Idle.")
 #       one window for each part (reconstruction, pattern gen with export/import?)
 # - proper checking if patterns and image are present, == None is not optimal! (ambiguity error when calling it on a non-None element)
 # implement hadamard module functionality - needs to work/recognize pattern types in dirs
+
 while True:
 	# IMPORTANT!
 	# re-call layouts every loop iteration to avoid errors during reopening windows!
-	# the same layouts (as in 'same variables') cannot be reused in pysimplegui!
+	# the same layouts (as in 'the same variables') cannot be reused in pysimplegui!
 
 	gallery_layout = [
 		[
@@ -268,7 +268,7 @@ while True:
 			main_window.FindElement("-STATUS-").Update("Starting reconstruction...")
 			
 			if patterns[0][0].size == image_resized.size:
-				reconstructed_image, fourier_spectrum_2D_padded = fourier.reconstruct_image(resolution, scale, fourier.calculate_fourier_coeffs(fourier.mask_image(image_resized, patterns)), "lowpass", 0)
+				reconstructed_image, fourier_spectrum_2D_padded = fourier.reconstruct_image(resolution, scale, fourier.calculate_fourier_coeffs(fourier.mask_image(image_resized, patterns)), "lowpass", 0, 0)
 				
 				print("Reconstruction done.")
 				main_window.FindElement("-STATUS-").Update("Reconstruction done.")
@@ -283,6 +283,7 @@ while True:
 				print("Pattern size is different from the selected resolution!")
 				main_window.FindElement("-STATUS-").Update("Reconstruction error - wrong pattern size!")
 	
+	# reconstruct images from measurements in program memory
 	elif event == "-RECONSTRUCT_REAL-":
 		# DEBUG when commented
 		if len(intensity_coeff_list) < 1:
@@ -295,17 +296,34 @@ while True:
 			
 			norm_mode = int(values["-NORM_MODE-"])
 			
-			reconstructed_image, fourier_spectrum_2D_padded = fourier.reconstruct_image(resolution, scale, intensity_coeff_list, "real", norm_mode)
+			reconstructed_image, fourier_spectrum_2D_padded = fourier.reconstruct_image(resolution, scale, intensity_coeff_list, "real", norm_mode, 0)
 
 			print("Reconstruction done.")
 			main_window.FindElement("-STATUS-").Update("Reconstruction done.")
-				
-			# DEBUG Fourier plane
-			aux.save_image_complex(np.real(fourier_spectrum_2D_padded), "./GALLERY/fourier_padded", "")
-				
-			#aux.save_image(gallery_directory, reconstructed_image, "rec_img")
-			#aux.show_images([image, np.real(fourier_spectrum_2D_padded), np.real(reconstructed_image)], 1)
 			
+			# the reconstruction currently doesn't show images with aux as the default program errors out - the code in fourier_module saves the images to GALLERY
+	
+	# reconstruct images from a saved measurement file
+	elif event == "-RECONSTRUCT_FILE-":
+		
+	
+		# DEBUG when commented
+		if len(intensity_coeff_list) < 1:
+			print("No measurements!")
+			main_window.FindElement("-STATUS-").Update("No measurements!")
+	
+		else:
+			print("Starting reconstruction...")
+			main_window.FindElement("-STATUS-").Update("Starting reconstruction...")
+			
+			norm_mode = int(values["-NORM_MODE-"])
+			
+			reconstructed_image, fourier_spectrum_2D_padded = fourier.reconstruct_image(resolution, scale, intensity_coeff_list, "real", norm_mode, values["-MEAS_FILE-"])
+
+			print("Reconstruction done.")
+			main_window.FindElement("-STATUS-").Update("Reconstruction done.")
+	
+	# generate pattersn for simulation or scene modulation
 	elif event == "-GENERATE_PATTERNS-":
 			
 		print("Generating patterns...")
@@ -328,6 +346,7 @@ while True:
 		if image is not None:
 			main_window.FindElement("-RECONSTRUCT-").Update(disabled=False)
 	
+	# save patterns to files for remote BBB scene modulation
 	elif event == "-EXPORT_PATTERNS-":
 		# TODO: add mode selection to export patterns as .png
 		if patterns != None:
@@ -368,6 +387,7 @@ while True:
 			print("Can't load patterns, pattern directory is empty!")
 			main_window.FindElement("-STATUS-").Update("Can't load patterns, pattern directory is empty!")
 
+	# load a sample image for simulated modulation and reconstruction
 	elif event == "-LOAD_IMG-":
 		image_loader_window = sg.Window("LOAD", image_loader_layout, finalize=True)
 		
@@ -410,6 +430,7 @@ while True:
 
 		image_loader_window.close()
 	
+	# clear the pattern directory
 	elif event == "-CLEAR_PATTERNS-":
 		try:
 			print("Clearing patterns in pattern directory...")
@@ -423,7 +444,8 @@ while True:
 		except PermissionError:
 			print("Error removing patterns! Please clear the folder manually or wait for a few minutes before retrying.")
 			main_window.FindElement("-STATUS-").Update("Error removing patterns! Please clear the folder manually or wait for a few minutes before retrying.")
-		
+	
+	# change parameter values - needs to be explicit in this form of pysimplegui implementation
 	elif event == "-CHANGE_VALS-":
 		print("Changing values...")
 		main_window.FindElement("-STATUS-").Update("Changing values...")
@@ -442,7 +464,7 @@ while True:
 		print("Parameter values changed.")
 		main_window.FindElement("-STATUS-").Update("Parameter values changed.")
 	
-	# Remote system control
+	# control remote systems for modulation and detection
 	elif event == "-REMOTE_CONTROL-":
 		# remote control window initialization
 		remote_window = sg.Window("Remote control", remote_control_layout, finalize=True)
@@ -532,19 +554,15 @@ while True:
 						if BBB_event == "Exit" or BBB_event == sg.WIN_CLOSED:
 							break
 						
-						elif BBB_event == "-SEND_AND_DISPLAY_PATTERNS-":
-							# check if there already are patterns on the BBB
-							#output = aux.execute_remote_command(client, 'find /home/debian/Desktop/DLP_Control/structured_light;./pattern_disp -i')
-						
-							# TODO - add loop that will display all patterns in subsets
-							
+						elif BBB_event == "-SEND_AND_DISPLAY_PATTERNS-":	
+							# create list of patterns that have been generated and exported
 							pattern_list = os.listdir(patterns_directory)
 							
 							# if there are files in the pattern directory
 							if len(pattern_list) != 0:
 								# pattern starting number
 								p_num = 0
-								# pattern batch size - amount of patterns that will be sent to BBB
+								# pattern batch size - amount of patterns that will be sent to the BBB in one iteration
 								# Check if it works for large pattern sets
 								p_batch_size = int(BBB_values["-PATTERN_BATCH_SIZE-"])
 								
@@ -617,33 +635,11 @@ while True:
 											
 											output = aux.execute_remote_command(client, 'cd /home/debian/Desktop/DLP_Control/structured_light && ./pattern_disp -i')
 											
-											# COMMENT OUT FOR DEBUG - The program hangs on readlines() - check!
-											# if commented, the ssh client hangs and ftp_client.close() returns Administratively Prohibited error
-											#print(output[1].readlines())
-											#print(output[2].readlines())
-											
 											print("Starting triggered display...")
-											
-											# show first pattern
-											#output = aux.execute_remote_command(sub_client, 'echo high > /sys/class/gpio/gpio115/direction && sleep .05 && echo low > /sys/class/gpio/gpio115/direction')
-											#print(output[1].readlines())
-											#print(output[2].readlines())
-											
-											# BUG - the last pattern is not triggered and the process doesn't close - check loop arguments! -> added TEMPORARY +1 to loops, check if it works!
-											# BUG - tearing of some patterns - check if its CPU or code related! -> most likely CPU, check display driver support
-											# BUG - one measurment too many! - check loops
-											
-											#output = aux.execute_remote_command(sub_client, 'echo high > /sys/class/gpio/gpio115/direction && sleep .01 && echo low > /sys/class/gpio/gpio115/direction')
-											#print(output[1].readlines())
-											#print(output[2].readlines())
 											
 											# most likely required to allow BBB to initialize the display program
 											# without this delay the pattern are sometimes not properly triggered and tend to lag 1 pattern behind
 											time.sleep(0.5)
-											
-											#output = aux.execute_remote_command(sub_client, 'echo high > /sys/class/gpio/gpio115/direction && sleep .01 && echo low > /sys/class/gpio/gpio115/direction')
-											#print(output[1].readlines())
-											#print(output[2].readlines())
 											
 											# trigger the display of concurrent patterns
 											# temporary range from 1 to check if it helps reduce measurments
@@ -654,6 +650,7 @@ while True:
 													print(output[1].readlines())
 													print(output[2].readlines())
 											
+												# commands that are sent to the arduino
 												# TODO - add GUI-side control of command value
 												
 												# single-shot
@@ -691,8 +688,6 @@ while True:
 												else:
 													print("Arduino not connected!")
 													
-												
-												
 												# end pattern display after batch, AFTER measurement
 												#if remote_p_num == p_batch_size*3-1:
 													# echo taken from:
@@ -718,7 +713,7 @@ while True:
 											#print(output[2].readlines())
 												
 											aux.close_ssh(sub_client)
-										
+									
 									else:
 										output = aux.execute_remote_command(client, 'cd /home/debian/Desktop/DLP_Control/structured_light && ./pattern_disp -k ' + BBB_values["-FRAMERATE-"])
 										print(output[1].readlines())
@@ -742,6 +737,10 @@ while True:
 								print("\nLiczba wyznaczonych współczynników: \n")
 								print(len(intensity_coeff_list))
 								
+								# save the measurements to a text file
+								# filename identifies the parameters used for acquisition
+								aux.save_measurements(intensity_coeff_list, 'measurement_' + str(values[]) + '_' + str(values[]))
+								
 							else:
 								print("No patterns to send in directory!")
 				else:
@@ -754,7 +753,7 @@ while True:
 				pass
 			
 			# TODO
-			# connect to oscilloscope for measurement vector acquisition
+			# connect to oscilloscope/Arduino with ADC for measurement vector acquisition
 			elif remote_event == "-ARD_CONNECT-":
 				# TODO
 				# initial connection
