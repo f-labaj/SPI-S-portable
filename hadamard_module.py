@@ -23,6 +23,8 @@ from scipy.linalg import hadamard
 
 from sklearn.metrics import mean_squared_error
 
+import auxiliary_functions as aux
+
 # odpalenie silnika matlaba pod eng, do IFWHT
 #import matlab.engine
 #eng = matlab.engine.start_matlab()
@@ -48,53 +50,73 @@ from sklearn.metrics import mean_squared_error
 
 # TODO
 # WIP!
-def generate_patterns(resolution):
-    N = resolution
+def generate_patterns(resolution, scale):
+	M = scale
+	N = resolution
 
-    for i in range(int(N**2)):
-        mask_full = np.resize(hadamard_matrix[i,:], (N, N))
-        
-        mask_pos = mask_full.copy()
-        mask_neg = mask_full.copy()
-        
-		# threshold from (-1, 0, 1) to (0, 1)
-        mask_pos[mask_pos<0] = 0
-        mask_pos[mask_pos>0] = 1
-        mask_neg[mask_neg>0] = 0
-        mask_neg[mask_neg<0] = 1
+	mask_list = []
 
-        mask_list.append([mask_pos, mask_neg])
-        
-    return mask_list
+	# TODO - check if N**2 * M is correct
+	# alternate - (N*M) **2
+	
+	hadamard_matrix = np.array(hadamard(int((N**2 * M))))
 
-def mask_image():
-    masked_image_list = []
-    for mask_pair in mask_list:
-        masked_image_list.append([image_gray*mask_pair[0], image_gray*mask_pair[1]])
-    
-	
-	
-def calculate_intensity_vector():
-    intensity_vector = []
-    intensity_vector.append(np.sum(image_gray*mask_pair[0])-np.sum(image_gray*mask_pair[1]))
-    
-	
-# reconstruct the image based on a simulated or measured vector of intensity values
-def reconstruct_image(intensity_vector, N, mode):
-	if mode == 'real':
-		# check if our measured vector has the correct size
-		while !aux.is_square(len(intensity_vector)):
-			# remove last element of the list, loop will exit if it has a real root
-			intensity_vector.pop()
+	for i in range(int(N**2 * M)):
+		mask_full = np.resize(hadamard_matrix[i,:], (N, N))
 		
-		result_pre = hadamard_matrix.dot(intensity_vector)
-		result_final = np.reshape(result_pre, (N,N))
-		result_final *= (1.0/result_final.max())
+		mask_pos = mask_full.copy()
+		mask_neg = mask_full.copy()
+		
+		# threshold from (-1, 0, 1) to (0, 1)
+		mask_pos[mask_pos<0] = 0
+		mask_pos[mask_pos>0] = 1
+		mask_neg[mask_neg>0] = 0
+		mask_neg[mask_neg<0] = 1
+
+		mask_list.append([mask_pos, mask_neg])
+		
+	return mask_list
+
+def mask_image(image_gray, mask_list):
+	intensity_vector = []
 	
-	elif mode == 'simulation':
-		result_pre = hadamard_matrix.dot(intensity_vector)
-		result_final = np.reshape(result_pre, (N,N))
-		result_final *= (1.0/result_final.max())
+	for mask_pair in mask_list:
+		intensity_vector.append(np.sum(image_gray*mask_pair[0])-np.sum(image_gray*mask_pair[1]))
+
+	return intensity_vector
+
+# reconstruct the image based on a simulated or measured vector of intensity values
+def reconstruct_image(resolution, scale, intensity_vector):
+	N = resolution
+	M = scale
+	
+	############ Check if this works for scales other than 1!
+	# check if our measured vector has the correct size
+	while aux.is_square(len(intensity_vector)) is False:
+		# remove last element of the list, loop will exit if it has a real root
+		intensity_vector.pop()
+		
+	############ TEST - change the resolution to fit the measured intensity vector, after size correction
+	if len(intensity_vector) != N**2:
+		N = math.sqrt(len(intensity_vector))
+		# check if setting the scale to 1 is correct!
+		M = 1
+	
+	# TODO - add passing of the matrix generated for patterns
+	# generate a default hadamard matrix for reconstruction
+	hadamard_matrix = np.array(hadamard(int((N**2 * M))))
+	
+	# TODO - fix for M/scale usage
+	# extend intensities
+	K = int(N**2 - (N**2 * M))
+	intensity_vector = intensity_vector[: len(intensity_vector) - K]
+	intensity_vector.extend([0] * K)
+		
+	# multiply the hadamard matrix with measured/simulated intensities
+	# x = H'y, but due to H = H', multiplication is enough for reconstruction
+	result_pre = hadamard_matrix.dot(intensity_vector)
+	result_final = np.reshape(result_pre, (N,N))
+	result_final *= (1.0/result_final.max())
 		
 	return result_final
 

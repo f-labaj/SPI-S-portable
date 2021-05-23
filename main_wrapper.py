@@ -4,6 +4,9 @@ import sys, os, time, random
 # helper functions, mainly IO
 import auxiliary_functions as aux
 
+# string regular expressions
+import re
+
 # masking and reconstruction
 import fourier_module as fourier
 ## still WIP!
@@ -21,6 +24,9 @@ import matplotlib.pyplot as plt
 
 import arduino_control as arcon
 dev = None
+
+# initial definition for main menu functionality, recalled later in measurements as = []
+intensity_coeff_list = []
 
 # directory locations
 ground_truths_directory = "./GT/"
@@ -56,13 +62,13 @@ patterns = None
 
 intensity_vector = []
 
-# Graphical theme for pysimplegui interface
+# Graphical theme for pysimplegui interface windows
 sg.theme('LightGreen2')
 
 # main window GUI definition
 main_control_column = [
 	[
-		sg.Button("Reconstruct", key="-RECONSTRUCT-", disabled=True),
+		sg.Button("Reconstruct/Virtual", key="-RECONSTRUCT-", disabled=True),
 		sg.VSeparator(),
 		sg.Button("Reconstruct/Real", key="-RECONSTRUCT_REAL-", disabled=False),
 		sg.VSeparator(),
@@ -122,6 +128,18 @@ menu_layout = [
 	[
 		sg.Text("Current loaded image: "),
 		sg.Text("None", size=(15, 1), key="-CURRENT_IMAGE_NAME-"),
+	],
+	
+	[
+		sg.HSeparator(),
+	],
+	
+	[
+		sg.Text("Meas. IO filename: ", size =(20, 1)), sg.InputText(size=(10, 1), key="-MEAS_FILE-"),
+	],
+		
+	[
+		sg.Button("Load from file", key="-LOAD_MEAS-"),
 	],
 	
 	[
@@ -268,16 +286,22 @@ while True:
 			main_window.FindElement("-STATUS-").Update("Starting reconstruction...")
 			
 			if patterns[0][0].size == image_resized.size:
-				reconstructed_image, fourier_spectrum_2D_padded = fourier.reconstruct_image(resolution, scale, fourier.calculate_fourier_coeffs(fourier.mask_image(image_resized, patterns)), "lowpass", 0, 0)
+				if values["-FOURIER-"] is True and values["-HADAMARD-"] is True or values["-FOURIER-"] is False and values["-HADAMARD-"] is False:
+					print("Please choose only one type of patterns!")
+				
+				elif values["-FOURIER-"] is True and values["-HADAMARD-"] is False:
+					reconstructed_image, fourier_spectrum_2D_padded = fourier.reconstruct_image(resolution, scale, fourier.calculate_fourier_coeffs(fourier.mask_image(image_resized, patterns)), "lowpass", 0, 0)
+					aux.save_image(np.real(fourier_spectrum_2D_padded), "fourier_padded", "")
+					
+				elif values["-FOURIER-"] is False and values["-HADAMARD-"] is True:
+					reconstructed_image = hadamard.reconstruct_image(resolution, scale, hadamard.mask_image(image_resized, patterns))
 				
 				print("Reconstruction done.")
 				main_window.FindElement("-STATUS-").Update("Reconstruction done.")
-				
-				# DEBUG Fourier plane
-				aux.save_image(np.real(fourier_spectrum_2D_padded), "fourier_padded", "")
-				
+
 				#aux.save_image(gallery_directory, reconstructed_image, "rec_img")
-				aux.show_images([image, image_resized, np.real(fourier_spectrum_2D_padded), np.real(reconstructed_image)], 1)
+				#aux.show_images([image, image_resized, np.real(fourier_spectrum_2D_padded), np.real(reconstructed_image)], 1)
+				aux.show_images([np.real(reconstructed_image)], 1)
 			
 			else:
 				print("Pattern size is different from the selected resolution!")
@@ -296,32 +320,19 @@ while True:
 			
 			norm_mode = int(values["-NORM_MODE-"])
 			
-			reconstructed_image, fourier_spectrum_2D_padded = fourier.reconstruct_image(resolution, scale, intensity_coeff_list, "real", norm_mode, 0)
-
+			if values["-FOURIER-"] is True and values["-HADAMARD-"] is True or values["-FOURIER-"] is False and values["-HADAMARD-"] is False:
+				print("Please choose only one type of patterns!")
+			
+			elif values["-FOURIER-"] is True and values["-HADAMARD-"] is False:
+				reconstructed_image, fourier_spectrum_2D_padded = fourier.reconstruct_image(resolution, scale, intensity_coeff_list, "real", norm_mode, 0)
+				
+			elif values["-FOURIER-"] is False and values["-HADAMARD-"] is True:
+				reconstructed_image = hadamard.reconstruct_image(resolution, scale, intensity_coeff_list)
+			
 			print("Reconstruction done.")
 			main_window.FindElement("-STATUS-").Update("Reconstruction done.")
 			
 			# the reconstruction currently doesn't show images with aux as the default program errors out - the code in fourier_module saves the images to GALLERY
-	
-	# reconstruct images from a saved measurement file
-	elif event == "-RECONSTRUCT_FILE-":
-		
-	
-		# DEBUG when commented
-		if len(intensity_coeff_list) < 1:
-			print("No measurements!")
-			main_window.FindElement("-STATUS-").Update("No measurements!")
-	
-		else:
-			print("Starting reconstruction...")
-			main_window.FindElement("-STATUS-").Update("Starting reconstruction...")
-			
-			norm_mode = int(values["-NORM_MODE-"])
-			
-			reconstructed_image, fourier_spectrum_2D_padded = fourier.reconstruct_image(resolution, scale, intensity_coeff_list, "real", norm_mode, values["-MEAS_FILE-"])
-
-			print("Reconstruction done.")
-			main_window.FindElement("-STATUS-").Update("Reconstruction done.")
 	
 	# generate pattersn for simulation or scene modulation
 	elif event == "-GENERATE_PATTERNS-":
@@ -339,7 +350,7 @@ while True:
 			main_window.FindElement("-STATUS-").Update("Fourier patterns generated to memory.")
 		
 		elif values["-FOURIER-"] is False and values["-HADAMARD-"] is True:
-			patterns = hadamard.generate_patterns(resolution)
+			patterns = hadamard.generate_patterns(resolution, scale)
 			print("Hadamard patterns generated to memory.")
 			main_window.FindElement("-STATUS-").Update("Hadamard patterns generated to memory.")
 
@@ -429,6 +440,33 @@ while True:
 					image_num+=1
 
 		image_loader_window.close()
+	
+	# load a previous measurement for reconstruction
+	# any measurements that finish are saved to files as a backup
+	# WARNING! This will overwrite any measurements currently stored in memory
+	elif event == "-LOAD_MEAS-":
+		# loads all values from the file to coeff_list, as complex type
+		# TODO - check if the type is correct and allows for reconstruction!
+		
+		# filename is input by user - ALTERNATIVE: check file folder for files, let user choose
+		filename = values["-MEAS_FILE-"]
+		
+		intensity_coeff_list = aux.load_measurements(filename)
+		
+		if len(intensity_coeff_list) >= 1:
+			print("Measurements loaded from file.")
+			main_window.FindElement("-STATUS-").Update("Measurements loaded from file.")
+			
+			# get reconstruction parameters from filename substrings, using re
+			main_window.FindElement("-FACTOR-").Update(re.findall(r'_(.+?)_', filename))
+			main_window.FindElement("-RESOLUTION-").Update(re.findall(r'-(.+?)-', filename))
+			
+		else:
+			print("Error while loading measurements from file!")
+			main_window.FindElement("-STATUS-").Update("Error while loading measurements from file!")
+			
+			# reset coeff_list
+			intensity_coeff_list = []
 	
 	# clear the pattern directory
 	elif event == "-CLEAR_PATTERNS-":
@@ -674,6 +712,7 @@ while True:
 												#    print(output[1].readlines())
 												#    print(output[2].readlines())
 												
+												# if arduino is connected
 												if remote_values["-ARD_STATUS-"] is True:
 													#output = aux.execute_remote_command(sub_client, 'echo high > /sys/class/gpio/gpio115/direction && sleep .1 && echo low > /sys/class/gpio/gpio115/direction')
 													#print(output[1].readlines())
@@ -726,6 +765,7 @@ while True:
 								print(len(intensity_vector))
 								
 								# calculate coefficients based on the measured intensities
+								# re-called variable, the first call was to provide a variable for main menu functionality
 								intensity_coeff_list = []
 								
 								for i in range(0, len(intensity_vector), 3):
@@ -739,7 +779,7 @@ while True:
 								
 								# save the measurements to a text file
 								# filename identifies the parameters used for acquisition
-								aux.save_measurements(intensity_coeff_list, 'measurement_' + str(values[]) + '_' + str(values[]))
+								aux.save_measurements(intensity_coeff_list, 'meas_' + str(values["-RESOLUTION-"]) + '_-' + str(values["-FACTOR-"]) + '-')
 								
 							else:
 								print("No patterns to send in directory!")
@@ -763,12 +803,14 @@ while True:
 				#	print("Connected to oscilloscope!")
 				#pass
 				
+				# get port number from user input
 				arduino_port = remote_values["-ARD_PORT-"]
 				
 				# if not filled, default to COM7
 				if arduino_port is None:
 					arduino_port = 'COM7'
 				
+				# create serial device, connect
 				dev = arcon.init_serial(arduino_port, 9600, 0)
 				if dev != None:
 					print("Arduino connected!")

@@ -11,8 +11,6 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 
-import gmpy
-
 # Image processing
 from PIL import Image
 
@@ -320,7 +318,7 @@ def reconstruct_image(resolution, scaling, fourier_coeff_list, mode, norm_mode, 
 		
 		# check if there is enough measurement points for reconstruction/the vector length has a root
 		# if not - change the length to fit, cutting out or adding some data
-		while !aux.is_square(len(fourier_coeff_list)):
+		while aux.is_square(len(fourier_coeff_list)) is False:
 			# remove last element of the list, loop will exit if it has a real root
 			fourier_coeff_list.pop()
 			
@@ -339,7 +337,7 @@ def reconstruct_image(resolution, scaling, fourier_coeff_list, mode, norm_mode, 
 		
 		# check if there is enough measurement points for reconstruction/the vector length has a root
 		# if not - change the length to fit, cutting out or adding some data
-		while !aux.is_square(len(fourier_coeff_list)):
+		while aux.is_square(len(fourier_coeff_list)) is False:
 			# remove last element of the list, loop will exit if it has a real root
 			fourier_coeff_list.pop()
 		

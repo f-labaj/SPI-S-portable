@@ -1,6 +1,7 @@
 import serial
 import time
 
+# connect to Arduino
 def init_serial(port_num, speed, tout):
     try:
         # DEBUG
@@ -25,6 +26,7 @@ def init_serial(port_num, speed, tout):
     except:
         print("Could not connect to Arduino! Check if it's plugged in / COM port number.")
 
+# read value measured on Arduino, in two blocks
 def get_value(ser, command):
     try:	
         ser.write(command)
@@ -43,7 +45,8 @@ def get_value(ser, command):
     
     except:
         print("Error retrieving values from Arduino!")
-    
+
+# close the serial connection 
 def close_serial(ser):
     if ser is not None:
         ser.close()
