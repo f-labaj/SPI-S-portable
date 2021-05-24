@@ -695,7 +695,10 @@ while True:
 												#command = b'n'
 												
 												# 10x averaging 
-												command = b'a'
+                                                #command = b'a'
+                                                
+                                                # max val after 10 measures
+												command = b'x'
 												
 												# placeholder for a detector other than the photoresistor
 												#command = b'c'

@@ -2,12 +2,12 @@ int analogPin = 1;
 int command = 0;
 int value = 0;
 int meas = 0;
-int sample_num = 0;
 int temp_meas = 0;
 
 byte b1, b2;
 
 int avg_num = 10;
+int sample_num = 50;
 
 void setup() {
   Serial.begin(9600);
@@ -53,8 +53,9 @@ void loop() {
   }
 
   else if(value == 'x') {
-      for int (n=0; n<sample_num; n++) {
-          temp = analogRead();
+      int temp =0;
+      for (int n=0; n<sample_num; n++) {
+          temp = analogRead(analogPin);
           if(temp > meas){
             meas = temp;
           }
