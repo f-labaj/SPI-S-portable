@@ -115,8 +115,14 @@ def save_measurements(meas, file):
 
 def load_measurements(file):
     # load the array as complex 
-    meas_load = np.loadtxt(file + '.txt').view(complex)
-    return meas_load
+	try:
+		meas_load = np.loadtxt(file + '.txt').view(complex)
+		
+	except:
+		print("Error opening file!")
+		meas_load = []
+		
+	return meas_load
     
 # TODO mode
 def load_list_of_lists(directory, mode):

@@ -108,7 +108,42 @@ def generate_patterns(resolution, scaling, A, B, threshold_flag, mode, patterns_
 	
 	###
 	
-	if mode is "lowpass":
+	# DEBUG
+	# test mode for checking and validating other patterns/sampling strategies
+	if mode is "test":
+		rng = int(N/M * 0.5)
+		for f_x in range(-rng, rng, 1):
+			for f_y in range(-rng, rng, 1):
+				phase_mask_list = []
+				for phase in phase_values:
+					fourier_basis = np.zeros((N, N))
+					for i in range(int(N)):
+						for j in range(int(N)):
+							fourier_basis[i, j] = A + B * np.cos(2*np.pi * f_x/N * i + 2*np.pi * f_y/N * j + phase)
+					
+					# TODO - add threshold method selection in menu
+					##
+					
+					# TODO - add CNN/DL method of threshold
+					##
+					
+					# TODO - add dithering
+					##
+					
+					# basic thresholding
+					fourier_basis = threshold_array(fourier_basis, threshold_flag)
+					
+					phase_mask_list.append(fourier_basis)
+					
+				# debug
+				#show_images(phase_mask_list)
+				basis_list.append(phase_mask_list)
+				
+				# debug
+				print("F_x:" + str(f_x) + "\n" + "F_y:" + str(f_y) + "\n")
+	
+	# lowpass mode - CS is achieved by generating and using only low-valued frequencies
+	elif mode is "lowpass":
 		# indexing from 1 to prevent uniform fields for arguments 0
 		for f_x in range(1, int(N/M)+1, 1):
 			for f_y in range(1, int(N/M)+1, 1):
@@ -125,22 +160,22 @@ def generate_patterns(resolution, scaling, A, B, threshold_flag, mode, patterns_
 					# TODO - add CNN/DL method of threshold
 					##
 					
-					
-					
 					# TODO - add dithering
 					##
 					
 					# basic thresholding
-					
 					fourier_basis = threshold_array(fourier_basis, threshold_flag)
 					
 					phase_mask_list.append(fourier_basis)
+					
 				# debug
 				#show_images(phase_mask_list)
 				basis_list.append(phase_mask_list)
+				
 				# debug
 				print("F_x:" + str(f_x) + "\n" + "F_y:" + str(f_y) + "\n")
 
+	# other modes that use other parts of the Fourier space
 	elif mode is "midpass_alt":
 		for f_x in range(0, N, M):
 			for f_y in range(0, N, M):
@@ -232,7 +267,6 @@ def mask_image(image, basis_list):
 			
 		masked_image_list.append(masked_image_sub)
 		
-
 	end = time.time()
 	
 	print("\nMasking time: " + str(float(end-start)) + "s\n")
@@ -283,7 +317,20 @@ def reconstruct_image(resolution, scaling, fourier_coeff_list, mode, norm_mode, 
 	fourier_spectrum_2D_padded = np.zeros((N,N))
 	reconstructed_image = np.zeros((N,N))
 	
-	if mode is "lowpass":
+	if mode is "test":
+		# reshape the measurement vector to 2D
+		fourier_spectrum_2D = np.reshape(fourier_spectrum, (int(N/M), int(N/M)))
+		
+		#fourier_spectrum_2D_padded = np.zeros((N,N),dtype=complex)
+		
+		# since in the test mode the spectrum is centered, padding is applied to each side
+		fourier_spectrum_2D_padded = np.pad(fourier_spectrum_2D, int(N/2), mode='constant')
+		
+		#DEBUG
+		aux.save_image(np.real(fourier_spectrum_2D), "./GALLERY/fourier_unpadded", "")
+		aux.save_image(np.real(fourier_spectrum_2D_padded), "./GALLERY/fourier_padded", "")
+	
+	elif mode is "lowpass":
 		# TODO - recheck correctness of np.reshape vs real fourier spectrum
 		
 		fourier_spectrum_2D = np.reshape(fourier_spectrum, (int(N/M), int(N/M)))
@@ -292,26 +339,11 @@ def reconstruct_image(resolution, scaling, fourier_coeff_list, mode, norm_mode, 
 		fourier_spectrum_2D_padded[0:fourier_spectrum_2D.shape[0], 0:fourier_spectrum_2D.shape[1]] = fourier_spectrum_2D
 		
 		#DEBUG
-		aux.save_image(np.real(fourier_spectrum_2D), "./GALLERY/fourier_unpadded", "")
-		
-		# # Reshape spectrum to correct quadrant form
-		# coord = len(fourier_spectrum_2D_padded) // 2
-		
-		# q1, q2, q3, q4 = fourier_spectrum_2D_padded[:coord, :coord], fourier_spectrum_2D[coord:, :coord], fourier_spectrum_2D[:coord, coord:], fourier_spectrum_2D[coord:, coord:]
-		
-		# fourier_spectrum_2D_padded[:coord, :coord] = q4
-		# fourier_spectrum_2D_padded[coord:, :coord] = q3
-		# fourier_spectrum_2D_padded[:coord, coord:] = q2
-		# fourier_spectrum_2D_padded[coord:, coord:] = np.flipud(np.fliplr(q1))
-		
-		# # DEBUG
-		# aux.save_image(np.real(q1), "q1", "")
-		# aux.save_image(np.real(q2), "q2", "")
-		# aux.save_image(np.real(q3), "q3", "")
-		# aux.save_image(np.real(q4), "q4", "")
+		aux.save_image_complex(np.real(fourier_spectrum_2D), "./GALLERY/fourier_unpadded", "")
+		aux.save_image_complex(np.real(fourier_spectrum_2D_padded), "./GALLERY/fourier_padded", "")
 	
 	# reconstruct from data saved to a file
-	# TODO
+	# TODO - change padding
 	elif mode is "from_file":
 		# load measurements from save directory
 		fourier_coeff_list = aux.load_measurements(meas_file)
@@ -324,8 +356,11 @@ def reconstruct_image(resolution, scaling, fourier_coeff_list, mode, norm_mode, 
 			
 		fourier_spectrum_2D = np.reshape(fourier_spectrum, ((int(N/M)), (int(N/M))))
 		
-		fourier_spectrum_2D_padded = np.zeros((N, N), dtype=complex)
-		fourier_spectrum_2D_padded[0:fourier_spectrum_2D.shape[0], 0:fourier_spectrum_2D.shape[1]] = fourier_spectrum_2D
+		
+		# changed to equal padding on all sides, for test patterns
+		fourier_spectrum_2D_padded = np.pad(fourier_spectrum_2D, int(N/2), mode='constant')
+		#fourier_spectrum_2D_padded = np.zeros((N, N), dtype=complex)
+		#fourier_spectrum_2D_padded[0:fourier_spectrum_2D.shape[0], 0:fourier_spectrum_2D.shape[1]] = fourier_spectrum_2D
 		
 		aux.save_image_complex(np.real(fourier_spectrum_2D), "./GALLERY/fourier_unpadded", "")
 		aux.save_image_complex(np.real(fourier_spectrum_2D_padded), "./GALLERY/fourier_padded", "")
@@ -345,8 +380,11 @@ def reconstruct_image(resolution, scaling, fourier_coeff_list, mode, norm_mode, 
 		# returns ValueError for complex? list "ValueError: Non-string object detected for the array ordering. Please pass in 'C', 'F', 'A', or 'K' instead"
 		fourier_spectrum_2D = np.reshape(fourier_spectrum, ((int(N/M)), (int(N/M))))
 		
-		fourier_spectrum_2D_padded = np.zeros((N, N), dtype=complex)
-		fourier_spectrum_2D_padded[0:fourier_spectrum_2D.shape[0], 0:fourier_spectrum_2D.shape[1]] = fourier_spectrum_2D
+		#fourier_spectrum_2D_padded = np.zeros((N, N), dtype=complex)
+		
+		# changed to equal padding on all sides, for test patterns
+		fourier_spectrum_2D_padded = np.pad(fourier_spectrum_2D, int(N/2), mode='constant')
+		#fourier_spectrum_2D_padded[0:fourier_spectrum_2D.shape[0], 0:fourier_spectrum_2D.shape[1]] = fourier_spectrum_2D
 		
 		aux.save_image_complex(np.real(fourier_spectrum_2D), "./GALLERY/fourier_unpadded", "")
 		aux.save_image_complex(np.real(fourier_spectrum_2D_padded), "./GALLERY/fourier_padded", "")
@@ -373,22 +411,33 @@ def reconstruct_image(resolution, scaling, fourier_coeff_list, mode, norm_mode, 
 	#else:
 	#	reconstructed_image = fft.ifft2(fourier_spectrum_2D)
 	
-	# reconstruct both the padded and unpadded spectrum
-	reconstructed_image = fft.ifft2(fourier_spectrum_2D_padded)
-	reconstructed_image_unpadded = fft.ifft2(fourier_spectrum_2D)
+	# reconstruct both the padded and unpadded spectrum using inverse FFT2D
+	# added ifftshift as a solution to checkerboard-patterned positive and negative values in reconstructed image
+	# thanks to https://stackoverflow.com/questions/10225765/checkerboard-pattern-after-fft
+	reconstructed_image = fft.ifft2(fft.ifftshift(fourier_spectrum_2D_padded))
+	reconstructed_image_unpadded = fft.ifft2(fft.ifftshift(fourier_spectrum_2D))
 	
 	end = time.time()
 	print("\nReconstruction time: " + str(float(end-start)) + "s\n")
 	
 	# save reconstructions of the padded and unpadded spectrum:
-	aux.save_image_complex(np.real(reconstructed_image_unpadded), "./GALLERY/image_unpadded", "")
-	aux.save_image_complex(np.real(reconstructed_image), "./GALLERY/image_unpadded", "")
+	aux.save_image_complex(np.real(reconstructed_image_unpadded), "./GALLERY/image_unpadded_real", "")
+	aux.save_image_complex(np.real(reconstructed_image), "./GALLERY/image_padded_real", "")
+	
+	# DEBUG
+	# phase
+	#aux.save_image_complex(np.angle(reconstructed_image_unpadded), "./GALLERY/image_unpadded_phase", "")
+	#aux.save_image_complex(np.angle(reconstructed_image), "./GALLERY/image_padded_phase", "")
+	
+	# DEBUG
+	# zero all negative values
+	#aux.save_image_complex(np.real(reconstructed_image_unpadded.clip(min=0)), "./GALLERY/image_unpadded_clip", "")
+	#aux.save_image_complex(np.real(reconstructed_image.clip(min=0)), "./GALLERY/image_padded_clip", "")
 
 	return (reconstructed_image, fourier_spectrum_2D_padded)
 	
 # TODO -> pass original image etc.
 def display_reconstructed_images(reconstructed_image, columns = 2, mode = "lowpass"):
-	
 	if mode is "lowpass":
 		reconstructed_image_resized = resize(np.real(reconstructed_image), (N, N), anti_aliasing=1)
 		show_images([image_gray, np.real(fourier_spectrum_2D), np.real(fourier_spectrum_2D_padded), np.real(reconstructed_image), np.real(reconstructed_image_padded), np.real(reconstructed_image_resized)], columns)

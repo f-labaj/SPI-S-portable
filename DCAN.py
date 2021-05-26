@@ -42,9 +42,8 @@ from keras.optimizers import Adam
 # https://keras.io/api/layers/regularizers/
 # should force the encoding layer to lean towards binary modulation of the training images
 # 
-def binary_regularizer(x):
-	
-	return 1e-3 * tf.
+#def binary_regularizer(x):
+#	return 1e-3 * tf.
 
 # encoder
 inp = Input((32, 32, 1))

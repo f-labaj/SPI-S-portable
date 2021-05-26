@@ -46,10 +46,13 @@ scale = 1
 resolution = 32
 
 # TODO - add controls for mode and threshold_mode on GUI level
-mode = "lowpass"
+mode = "test"
 # 0 - no threshold
 # 1 - 4 - global, local and adaptive thresholding options
 threshold_mode = 0
+
+# initial value - no normalization
+norm_mode = 0
 
 # fourier pattern generation parameters
 # TODO - add controls for parameters on GUI level
@@ -274,6 +277,7 @@ while True:
 	if event == "Exit" or event == sg.WIN_CLOSED:
 		break
 	
+	# virtual/simulation reconstruction
 	if event == "-RECONSTRUCT-":
 		image_resized = aux.resize_image(image, resolution)
 		
@@ -290,7 +294,7 @@ while True:
 					print("Please choose only one type of patterns!")
 				
 				elif values["-FOURIER-"] is True and values["-HADAMARD-"] is False:
-					reconstructed_image, fourier_spectrum_2D_padded = fourier.reconstruct_image(resolution, scale, fourier.calculate_fourier_coeffs(fourier.mask_image(image_resized, patterns)), "lowpass", 0, 0)
+					reconstructed_image, fourier_spectrum_2D_padded = fourier.reconstruct_image(resolution, scale, fourier.calculate_fourier_coeffs(fourier.mask_image(image_resized, patterns)), mode, 0, 0)
 					aux.save_image(np.real(fourier_spectrum_2D_padded), "fourier_padded", "")
 					
 				elif values["-FOURIER-"] is False and values["-HADAMARD-"] is True:
@@ -318,10 +322,12 @@ while True:
 			print("Starting reconstruction...")
 			main_window.FindElement("-STATUS-").Update("Starting reconstruction...")
 			
-			norm_mode = int(values["-NORM_MODE-"])
+			if values["-NORM_MODE-"] != '':
+				norm_mode = int(values["-NORM_MODE-"])
 			
 			if values["-FOURIER-"] is True and values["-HADAMARD-"] is True or values["-FOURIER-"] is False and values["-HADAMARD-"] is False:
 				print("Please choose only one type of patterns!")
+				main_window.FindElement("-STATUS-").Update("Please choose only one type of patterns!")
 			
 			elif values["-FOURIER-"] is True and values["-HADAMARD-"] is False:
 				reconstructed_image, fourier_spectrum_2D_padded = fourier.reconstruct_image(resolution, scale, intensity_coeff_list, "real", norm_mode, 0)
@@ -451,22 +457,27 @@ while True:
 		# filename is input by user - ALTERNATIVE: check file folder for files, let user choose
 		filename = values["-MEAS_FILE-"]
 		
-		intensity_coeff_list = aux.load_measurements(filename)
+		if filename != '':
+			intensity_coeff_list = aux.load_measurements(filename)
 		
-		if len(intensity_coeff_list) >= 1:
-			print("Measurements loaded from file.")
-			main_window.FindElement("-STATUS-").Update("Measurements loaded from file.")
-			
-			# get reconstruction parameters from filename substrings, using re
-			main_window.FindElement("-FACTOR-").Update(re.findall(r'_(.+?)_', filename))
-			main_window.FindElement("-RESOLUTION-").Update(re.findall(r'-(.+?)-', filename))
-			
+			if len(intensity_coeff_list) >= 1:
+				print("Measurements loaded from file.")
+				main_window.FindElement("-STATUS-").Update("Measurements loaded from file.")
+				
+				# get reconstruction parameters from filename substrings, using re
+				# 
+				main_window.FindElement("-RESOLUTION-").Update(re.findall(r'_(.+?)_', filename))
+				main_window.FindElement("-FACTOR-").Update(re.findall(r'-(.+?)-', filename))
+				
+			else:
+				print("Error while loading measurements from file!")
+				main_window.FindElement("-STATUS-").Update("Error while loading measurements from file!")
+				
+				# reset coeff_list
+				intensity_coeff_list = []
+				
 		else:
-			print("Error while loading measurements from file!")
-			main_window.FindElement("-STATUS-").Update("Error while loading measurements from file!")
-			
-			# reset coeff_list
-			intensity_coeff_list = []
+			print("No filename given!")
 	
 	# clear the pattern directory
 	elif event == "-CLEAR_PATTERNS-":
@@ -681,7 +692,22 @@ while True:
 											
 											# trigger the display of concurrent patterns
 											# temporary range from 1 to check if it helps reduce measurments
-											for remote_p_num in range(0, p_batch_size*3):
+											
+											# set number of shifted patterns - 3 for fourier (phase-shifted, 3-frame method), 2 for hadamard (+1, -1)
+											# preset for fourier
+											n = 3
+											
+											if values["-FOURIER-"] is True and values["-HADAMARD-"] is True or values["-FOURIER-"] is False and values["-HADAMARD-"] is False:
+												print("Please choose only one type of patterns!")
+												n = 3
+											
+											elif values["-FOURIER-"] is True and values["-HADAMARD-"] is False:
+												pass
+												
+											elif values["-FOURIER-"] is False and values["-HADAMARD-"] is True:
+												n = 2
+											
+											for remote_p_num in range(0, p_batch_size*n):
 												if remote_p_num == 0:
 													# start the display
 													output = aux.execute_remote_command(sub_client, 'echo high > /sys/class/gpio/gpio115/direction && sleep .01 && echo low > /sys/class/gpio/gpio115/direction')
