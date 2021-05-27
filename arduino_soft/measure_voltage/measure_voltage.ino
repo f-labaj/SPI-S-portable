@@ -7,7 +7,7 @@ int temp_meas = 0;
 byte b1, b2;
 
 int avg_num = 10;
-int sample_num = 50;
+int sample_num = 100;
 
 void setup() {
   Serial.begin(9600);
@@ -60,6 +60,8 @@ void loop() {
             meas = temp;
           }
       }
+
+      //meas = 1024 - meas;
 
       b1 = meas&0xFF;
       b2 = ( meas >> 8 ) & 0xFF;
