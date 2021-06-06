@@ -59,9 +59,14 @@ def generate_patterns(resolution, scale):
 	# TODO - check if N**2 * M is correct
 	# alternate - (N*M) **2
 	
-	hadamard_matrix = np.array(hadamard(int((N**2 * M))))
+	hadamard_matrix = np.array(hadamard(int((N**2))))
 
-	for i in range(int(N**2 * M)):
+	# DEBUG
+	# changed from:
+	# for i in range(int(N**2 * M)):
+	# Check if the new version works
+
+	for i in range(int((N*M)**2)):
 		mask_full = np.resize(hadamard_matrix[i,:], (N, N))
 		
 		mask_pos = mask_full.copy()
@@ -97,14 +102,17 @@ def reconstruct_image(resolution, scale, intensity_vector):
 		intensity_vector.pop()
 		
 	############ TEST - change the resolution to fit the measured intensity vector, after size correction
-	if len(intensity_vector) != N**2:
-		N = math.sqrt(len(intensity_vector))
-		# check if setting the scale to 1 is correct!
-		M = 1
+	#if len(intensity_vector) != N**2:
+	#	N = math.sqrt(len(intensity_vector))
+	#	# check if setting the scale to 1 is correct!
+	#	M = 1
 	
 	# TODO - add passing of the matrix generated for patterns
 	# generate a default hadamard matrix for reconstruction
-	hadamard_matrix = np.array(hadamard(int((N**2 * M))))
+	
+	temp_N = int(N**2)
+	print(temp_N)
+	hadamard_matrix = np.array(hadamard(temp_N))
 	
 	# TODO - fix for M/scale usage
 	# extend intensities
@@ -115,7 +123,7 @@ def reconstruct_image(resolution, scale, intensity_vector):
 	# multiply the hadamard matrix with measured/simulated intensities
 	# x = H'y, but due to H = H', multiplication is enough for reconstruction
 	result_pre = hadamard_matrix.dot(intensity_vector)
-	result_final = np.reshape(result_pre, (N,N))
+	result_final = np.reshape(result_pre, (int(N),int(N)))
 	result_final *= (1.0/result_final.max())
 		
 	return result_final
