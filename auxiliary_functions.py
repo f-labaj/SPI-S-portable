@@ -116,6 +116,12 @@ def save_measurements(meas, file):
 	# save the array as real (reinterpreted)
 	np.savetxt(file + '.txt', meas_arr.view(float))
 
+def save_measurement_vector(meas, file):
+	# convert meas list to numpy array
+	meas_arr = np.array(meas)
+	# save the array as real (reinterpreted)
+	np.savetxt(file + '.txt', meas_arr.view(int))
+
 def load_measurements(file):
 	# load the array as complex 
 	try:

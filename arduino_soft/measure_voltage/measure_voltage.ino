@@ -6,7 +6,7 @@ int temp_meas = 0;
 
 byte b1, b2;
 
-int avg_num = 10;
+int avg_num = 50;
 int sample_num = 100;
 
 void setup() {

@@ -392,7 +392,7 @@ def reconstruct_image(resolution, scaling, fourier_coeff_list, mode, norm_mode, 
 		#fourier_spectrum_2D_padded = np.zeros((N, N), dtype=complex)
 		
 		# changed to equal padding on all sides, for test patterns
-		fourier_spectrum_2D_padded = np.pad(fourier_spectrum_2D, int(N/2), mode='constant')
+		fourier_spectrum_2D_padded = np.pad(fourier_spectrum_2D, int((N - N/M)/2), mode='constant')
 		#fourier_spectrum_2D_padded[0:fourier_spectrum_2D.shape[0], 0:fourier_spectrum_2D.shape[1]] = fourier_spectrum_2D
 		
 		aux.save_image_complex(np.real(fourier_spectrum_2D), "./GALLERY/fourier_unpadded", "")
