@@ -133,6 +133,17 @@ def load_measurements(file):
 		
 	return meas_load
 	
+def load_measurements_real(file):
+	# load the array as complex 
+	try:
+		meas_load = np.loadtxt(file + '.txt').view(float)
+		
+	except:
+		print("Error opening file!")
+		meas_load = []
+		
+	return meas_load
+	
 # TODO mode
 def load_list_of_lists(directory, mode):
 	dir_list = os.listdir(directory)

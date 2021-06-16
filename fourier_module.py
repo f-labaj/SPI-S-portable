@@ -81,7 +81,8 @@ def generate_patterns(resolution, scaling, A, B, threshold_flag, mode, patterns_
 	N = resolution
 	
 	# compressive sensing parameter - how much of the signal will be used
-	M = int(1/scaling)
+	# changed from int to no type change! - 09.06.21
+	M = 1/scaling
 	
 	# DEBUG
 	print("Dimensions: " + str(resolution) + " x " + str(scaling))
@@ -444,17 +445,3 @@ def reconstruct_image(resolution, scaling, fourier_coeff_list, mode, norm_mode, 
 	#aux.save_image_complex(np.real(reconstructed_image.clip(min=0)), "./GALLERY/image_padded_clip", "")
 
 	return (reconstructed_image, reconstructed_image_unpadded, fourier_spectrum_2D, fourier_spectrum_2D_padded)
-	
-# TODO -> pass original image etc.
-def display_reconstructed_images(reconstructed_image, columns = 2, mode = "lowpass"):
-	if mode is "lowpass":
-		reconstructed_image_resized = resize(np.real(reconstructed_image), (N, N), anti_aliasing=1)
-		show_images([image_gray, np.real(fourier_spectrum_2D), np.real(fourier_spectrum_2D_padded), np.real(reconstructed_image), np.real(reconstructed_image_padded), np.real(reconstructed_image_resized)], columns)
-
-	elif mode is "midpass_alt":
-		reconstructed_image_resized = resize(np.real(reconstructed_image), (N, N), anti_aliasing=1)
-		show_images([image_gray, np.real(fourier_spectrum_2D), np.real(reconstructed_image)], columns)
-		
-	elif mode is "highpass":
-		reconstructed_image_resized = resize(np.real(reconstructed_image), (N, N), anti_aliasing=1)
-		show_images([image_gray, np.real(fourier_spectrum_2D), np.real(reconstructed_image), np.real(reconstructed_image_resized)], columns)

@@ -28,7 +28,7 @@ def train_images():
 	x = train_generator
 	return x[0][0], x[0][1]
 
-import tensorflow
+import tensorflow as tf
 import keras
 import pandas as pd
 import numpy as np
@@ -47,7 +47,15 @@ from keras.optimizers import Adam
 
 # encoder
 inp = Input((32, 32, 1))
-e = Conv2D(32, (3, 3), activity_regularizer=activation='relu')(inp)
+
+# generate mask
+mask = np.full((32, 32), True, dtype=bool)
+
+# mask the input
+m = tf.ragged.boolean_mask(inp, mask)
+
+# conv layers
+e = Conv2D(32, (3, 3), activation='relu')(m)
 e = Conv2D(64, (3, 3), activation='relu')(e)
 e = Conv2D(64, (3, 3), activation='relu')(e)
 l = Flatten()(e)
@@ -83,6 +91,9 @@ ae = Model(inp, decoded)
 ae.summary()
 
 sys.exit()
+
+
+
 
 #(train_images, train_labels), (test_images, test_labels) = mnist.load_data()
 #train_images = train_images.reshape((60000, 28, 28, 1))
