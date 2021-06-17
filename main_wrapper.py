@@ -301,20 +301,26 @@ while True:
 				elif values["-FOURIER-"] is True and values["-HADAMARD-"] is False:
 					reconstructed_image_padded, reconstructed_image, fourier_spectrum_2D, fourier_spectrum_2D_padded = fourier.reconstruct_image(resolution, scale, fourier.calculate_fourier_coeffs(fourier.mask_image(image_resized, patterns)), mode, 0, 0)
 					#aux.save_image(np.real(fourier_spectrum_2D_padded), "fourier_padded", "")
-					
+					aux.show_images([image_resized, np.real(reconstructed_image), np.real(reconstructed_image_padded), np.real(fourier_spectrum_2D), np.real(fourier_spectrum_2D_padded)], 2, ["a) resized ground truth", "b) unpadded reconstruction", "c) padded reconstruction", "d) unpadded spectrum", "e) padded spectrum"])
+	
+					aux.calculate_PSNR(image_resized, reconstructed_image_padded)
+					aux.calculate_SSIM(image_resized, reconstructed_image_padded)
+
 				elif values["-FOURIER-"] is False and values["-HADAMARD-"] is True:
 					reconstructed_image = hadamard.reconstruct_image(resolution, scale, hadamard.mask_image(image_resized, patterns))
-				
+					aux.show_images([image_resized, np.real(reconstructed_image)], 2, ["a) resized ground truth", "b) unpadded reconstruction"])
+
+					aux.calculate_PSNR(image_resized, reconstructed_image)
+					aux.calculate_SSIM(image_resized, reconstructed_image)
+					
 				print("Reconstruction done.")
 				main_window.FindElement("-STATUS-").Update("Reconstruction done.")
 
 				#aux.save_image(gallery_directory, reconstructed_image, "rec_img")
 				#aux.show_images([image, image_resized, np.real(fourier_spectrum_2D_padded), np.real(reconstructed_image)], 1)
-				aux.show_images([image_resized, np.real(reconstructed_image), np.real(reconstructed_image_padded), np.real(fourier_spectrum_2D), np.real(fourier_spectrum_2D_padded)], 2, ["a) resized ground truth", "b) unpadded reconstruction", "c) padded reconstruction", "d) unpadded spectrum", "e) padded spectrum"])
-
+				
 				# calculate PSNR and SSIM between the resized original image and padded reconstruction
-				aux.calculate_PSNR(image_resized, reconstructed_image_padded)
-				aux.calculate_SSIM(image_resized, reconstructed_image_padded)
+				
 
 			else:
 				print("Pattern size is different from the selected resolution!")
