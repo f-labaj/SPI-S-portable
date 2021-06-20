@@ -6,8 +6,8 @@ int temp_meas = 0;
 
 byte b1, b2;
 
-int avg_num = 50;
-int sample_num = 100;
+int avg_num = 20;
+int sample_num = 2000;
 
 void setup() {
   Serial.begin(9600);
@@ -19,6 +19,8 @@ void loop() {
   delay(100);
   
   if(value == 'n') {
+    delay(150);
+    
     meas = analogRead(analogPin);
 
     b1 = meas&0xFF;
@@ -37,6 +39,8 @@ void loop() {
 
   // from https://forum.arduino.cc/t/calculating-average-of-analog-read-values/427104
   else if(value == 'a') {
+      delay(150);
+      
       for (int n=0; n<avg_num; n++) {
         meas = ((meas) * n-1 + analogRead(analogPin)) / n ;
       }
@@ -53,7 +57,7 @@ void loop() {
   }
 
   else if(value == 'x') {
-      int temp =0;
+      int temp = 0;
       for (int n=0; n<sample_num; n++) {
           temp = analogRead(analogPin);
           if(temp > meas){
