@@ -8,8 +8,7 @@ def init_serial(port_num, speed, tout):
         #print(port_num)
         #print(speed)
         #print(tout)
-        
-        # TODO - add GUI-side user declaration of COM port number
+     
         ser = serial.Serial(
                         port=port_num,
                         baudrate=speed,

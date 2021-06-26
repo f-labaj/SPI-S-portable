@@ -94,10 +94,17 @@ def save_list_of_lists(list_of_lists, directory, export_mode, resolution):
 				arr_shape = np.shape(el)
 				pad_dim_y = int((360 - arr_shape[0]) / 2)
 				pad_dim_x = int((360 - arr_shape[1]) / 2)
-				el_resized_square = np.pad(el, ((pad_dim_y, pad_dim_x), (pad_dim_y, pad_dim_x)), 'constant', constant_values=0)
+				el_resized_square = np.pad(el, ((pad_dim_y, pad_dim_x), 
+												(pad_dim_y, pad_dim_x)), 
+												'constant', 
+												constant_values=0)
 				
-				el_resized_padded = np.pad(el_resized_square, ((0,0), (140,140)), 'constant', constant_values=0)
-				img = Image.fromarray((el_resized_padded * 255 ))
+				el_resized_padded = np.pad(el_resized_square, 
+										   ((0,0), (140,140)), 
+										   'constant', 
+										   constant_values=0)
+										   
+				img = Image.fromarray((np.real(el_resized_padded) * 255 ))
 				# change bit depth to 24-bit True Color - the only format accepted by DLP2000 default display software
 				img_24 = img.convert("RGB")
 				img_24.save(directory + str(i) + '_' + str(j) + '.bmp')
@@ -169,7 +176,6 @@ def load_list_of_lists(directory, mode):
 def save_image(image, img_name, directory):
 	#save(str(directory) + str(img_name) + '_.bmp', image, allow_pickle=False)
 	img = Image.fromarray(image)
-	# change bit depth to 24-bit True Color - the only format accepted by DLP2000 default display software
 	img_24 = img.convert("RGB")
 	img_24.save(str(directory) + str(img_name) + '.bmp')
 
@@ -251,7 +257,6 @@ def calculate_SSIM(ground_truth, reconstructed_image):
 
 	print("\nSSIM: " + str(SSIM))
 
-# WIP!
-def calculate_noise(ground_truth, reconstructed_image):
-	noise = ground_truth - reconstructed_image
-	# TODO!
+# TODO
+def add_noise(image, noise_type):
+	pass

@@ -46,7 +46,7 @@ scale = 1
 resolution = 32
 
 # TODO - add controls for mode and threshold_mode on GUI level
-mode = "test"
+mode = "spectral"
 # 0 - no threshold
 # 1 - 4 - global, local and adaptive thresholding options
 threshold_mode = 0
@@ -116,7 +116,6 @@ main_control_column = [
 	[
 		sg.Text("Thresh. mode:", size=(10, 1)), sg.InputText(size=(6, 1), key="-THRESHOLD_MODE-"),
 	],
-	
 ]
 
 menu_layout = [
@@ -129,8 +128,28 @@ menu_layout = [
 	],
 	
 	[
-		sg.Text("Current loaded image: "),
-		sg.Text("None", size=(15, 1), key="-CURRENT_IMAGE_NAME-"),
+		sg.Text("Only for simulation purposes:"),
+	],
+	
+	[
+		sg.Checkbox("Add white noise to GT", key="-ADD_WHITE_NOISE-", default=False),
+	],
+	
+	[
+		sg.Checkbox("Add pink noise to GT", key="-ADD_PINK_NOISE-", default=False),
+	],
+	
+	[
+		sg.Checkbox("Add blue noise to GT", key="-ADD_BLUE_NOISE-", default=False),
+	],
+	
+	[
+		sg.HSeparator(),
+	],
+	
+	[
+		sg.Text("Currently loaded image: "),
+		sg.Text("None", size=(20, 1), key="-CURRENT_IMAGE_NAME-"),
 	],
 	
 	[
@@ -176,7 +195,7 @@ menu_layout = [
 ]
 
 # main window initialization
-main_window = sg.Window("Single Pixel Imaging Simulator - SPIS v0.2", menu_layout, finalize=True)
+main_window = sg.Window("Single Pixel Imaging Simulator - SPIS v0.5 - 25.06.21", menu_layout, finalize=True)
 #main_window.maximize()
 main_window.FindElement("-STATUS-").Update("Idle.")
 
@@ -286,6 +305,16 @@ while True:
 	if event == "-RECONSTRUCT-":
 		image_resized = aux.resize_image(image, resolution)
 		
+		# Add noise to the resized, virtual GT image
+		if values["-ADD_WHITE_NOISE-"] is True:
+			image_resized = aux.add_noise(image_resized, "white")
+		
+		if values["-ADD_PINK_NOISE-"] is True:
+			image_resized = aux.add_noise(image_resized, "pink")
+			
+		if values["-ADD_BLUE_NOISE-"] is True:
+			image_resized = aux.add_noise(image_resized, "blue")
+			
 		if patterns == None:
 			print("No patterns! Please generate or add patterns to reconstruct the image.")
 			main_window.FindElement("-STATUS-").Update("No patterns! Please generate or add patterns to reconstruct the image.")
@@ -722,7 +751,9 @@ while True:
 										
 										for pattern_name in partial_pattern_dir_list:
 											print("Uploading pattern: " + pattern_name)
-											ftp_client.put("./PATTERNS/" + pattern_name, "/home/debian/Desktop/DLP_Control/structured_light/" + str(temp_number) + ".bmp")
+											ftp_client.put("./PATTERNS/" + 
+															pattern_name, "/home/debian/Desktop/DLP_Control/structured_light/" + 
+															str(temp_number) + ".bmp")
 											temp_number += 1
 											
 										print("Pattern subset sent!")
@@ -875,13 +906,21 @@ while True:
 								
 								# save measurements normalized by max
 								for i in range(0, len(intensity_vector), 3):
-									intensity_coeff_list.append((2*intensity_vector[i] - intensity_vector[i+1] - intensity_vector[i+2]) + np.sqrt(3)*1j*(intensity_vector[i+1] - intensity_vector[i+2]))
+									intensity_coeff_list.append((2*intensity_vector[i] - 
+																   intensity_vector[i+1] - 
+																   intensity_vector[i+2]) + 
+																   np.sqrt(3)*1j*(intensity_vector[i+1] - 
+																   intensity_vector[i+2]))
 								
 								aux.save_measurements(intensity_coeff_list, './SAVED_MEASUREMENTS/meas_' + str(values["-RESOLUTION-"]) + '_-' + str(values["-FACTOR-"]) + '-')
 								
 								# save measurements normalized by sum
 								for i in range(0, len(intensity_vector_sum), 3):
-									intensity_coeff_list_sum.append((2*intensity_vector_sum[i] - intensity_vector_sum[i+1] - intensity_vector_sum[i+2]) + np.sqrt(3)*1j*(intensity_vector_sum[i+1] - intensity_vector_sum[i+2]))
+									intensity_coeff_list_sum.append((2*intensity_vector_sum[i] - 
+																	   intensity_vector_sum[i+1] - 
+																	   intensity_vector_sum[i+2]) + 
+																	   np.sqrt(3)*1j*(intensity_vector_sum[i+1] - 
+																	   intensity_vector_sum[i+2]))
 
 								aux.save_measurements(intensity_coeff_list_sum, './SAVED_MEASUREMENTS/meas_sum_' + str(values["-RESOLUTION-"]) + '_-' + str(values["-FACTOR-"]) + '-')
 

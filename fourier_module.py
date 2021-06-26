@@ -6,6 +6,7 @@ import time
 import numpy as np
 import math
 import scipy.fft as fft
+from scipy import signal
 import imageio
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -122,15 +123,6 @@ def generate_patterns(resolution, scaling, A, B, threshold_flag, mode, patterns_
 						for j in range(int(N)):
 							fourier_basis[i, j] = A + B * np.cos(2*np.pi * f_x/N * i + 2*np.pi * f_y/N * j + phase)
 					
-					# TODO - add threshold method selection in menu
-					##
-					
-					# TODO - add CNN/DL method of threshold
-					##
-					
-					# TODO - add dithering
-					##
-					
 					# basic thresholding
 					fourier_basis = threshold_array(fourier_basis, threshold_flag)
 					
@@ -141,6 +133,27 @@ def generate_patterns(resolution, scaling, A, B, threshold_flag, mode, patterns_
 				basis_list.append(phase_mask_list)
 				
 				# debug
+				print("F_x:" + str(f_x) + "\n" + "F_y:" + str(f_y) + "\n")
+	
+	# TODO
+	# generate patterns through inverse Fourier transform of shifted delta functions
+	elif mode is "spectral":
+		rng = int(N/M * 0.5)
+		for f_x in range(-rng, rng, 1):
+			for f_y in range(-rng, rng, 1):
+				phase_mask_list = []
+				for phase in phase_values:
+					# change iteration or values, needs to go over the complex plane
+					fourier_basis = np.zeros((N, N))
+					fourier_basis[f_x, f_y] = 1.+0.j
+					fourier_basis = fft.ifft2(fourier_basis)
+	
+				fourier_basis = threshold_array(fourier_basis, threshold_flag)
+					
+				phase_mask_list.append(fourier_basis)
+	
+				basis_list.append(phase_mask_list)
+	
 				print("F_x:" + str(f_x) + "\n" + "F_y:" + str(f_y) + "\n")
 	
 	# lowpass mode - CS is achieved by generating and using only low-valued frequencies
@@ -272,9 +285,6 @@ def mask_image(image, basis_list):
 	
 	print("\nMasking time: " + str(float(end-start)) + "s\n")
 	
-	# flatten and plot the intensity vector list
-	#aux.plot_list(np.array(masked_image_list).flatten)
-	
 	return masked_image_list
 
 def calculate_fourier_coeffs(masked_image_list):
@@ -284,7 +294,11 @@ def calculate_fourier_coeffs(masked_image_list):
 
 	for masked_image_sub in masked_image_list:
 		# calculate fourier coefficients (3-image method)
-		fourier_coeff_list.append((2*masked_image_sub[0].sum() - masked_image_sub[1].sum() - masked_image_sub[2].sum()) + np.sqrt(3)*1j*(masked_image_sub[1].sum() - masked_image_sub[2].sum()))
+		fourier_coeff_list.append((2*masked_image_sub[0].sum() - 
+									 masked_image_sub[1].sum() - 
+									 masked_image_sub[2].sum()) + 
+									 np.sqrt(3)*1j*(masked_image_sub[1].sum() - 
+									 masked_image_sub[2].sum()))
 			
 	end = time.time()
 
