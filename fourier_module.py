@@ -43,27 +43,69 @@ def threshold_array(array, mode):
 	# no threshold
 	if mode == 0:	
 		thresh_array = array
-	
-	# skimage local? threshold
+		
+	# skimage local threshold
 	elif mode == 1:
+		thresh_array = threshold_local(array, 7)
+		thresh_array = array > thresh_array
+	
+	# skimage global threshold
+	elif mode == 2:
 		# possibly losing precision because of converting the array to uint8
 		thresh_array = threshold(img_as_ubyte(array), square(3))
-	
-	# skimage local threshold
-	elif mode == 2:
-		thresh_array = threshold_local(array, 7)
 		
-	# global threshold
-	# TODO: check if thresh_array + array works!
+	# numpy array global threshold
 	elif mode == 3:
+		thresh_array = array
+		thresh = np.amax(thresh_array) / 2
+	
 		thresh_array[array<thresh] = 0
 		thresh_array[array>=thresh] = 1
 		
-	# Dithering
 	elif mode == 4:
 		thresh_array = dither_array(array)
 		
 	return thresh_array
+	
+# generate patterns from a list of discrete spectral/frequency values
+def generate_patterns_adaptive(resolution, scaling, indices_array):
+	basis_list = []
+	
+	phase_values = [0, 2*np.pi/3, 4*np.pi/3]
+	
+	N = resolution
+	M = 1/scaling
+	
+	rng = int(N/M * 0.5)
+	
+	A = 0.5
+	B = 0.5
+	
+	for f_x in range(-rng, rng, 1):
+		for f_y in range(-rng, rng, 1):
+			phase_mask_list = []
+			for phase in phase_values:
+				fourier_basis = np.zeros((N, N))
+				# if the current frequency (fx, fy) is to be generated, iterate over pixels. Otherwise the pattern stays as np.zeros
+				# temporary workaround for indexing - adding the full range to get from <-32, 32> to <0, 64>
+				if indices_array[f_x+rng, f_y+rng] == 1:
+					for i in range(int(N)):
+						for j in range(int(N)):
+							fourier_basis[i, j] = A + B * np.cos(2*np.pi * f_x/N * i + 2*np.pi * f_y/N * j + phase)
+					
+				# basic thresholding
+				#fourier_basis = threshold_array(fourier_basis, threshold_flag)
+					
+				phase_mask_list.append(fourier_basis)
+					
+			# DEBUG
+			#show_images(phase_mask_list)
+			basis_list.append(phase_mask_list)
+				
+			# DEBUG
+			#print("F_x:" + str(f_x) + "\n" + "F_y:" + str(f_y) + "\n")
+
+	return basis_list
 
 # generate patterns for Fourier basis scan
 # A and B are coefficients for pattern generation in cos function
@@ -137,6 +179,7 @@ def generate_patterns(resolution, scaling, A, B, threshold_flag, mode, patterns_
 	
 	# TODO
 	# generate patterns through inverse Fourier transform of shifted delta functions
+	# also serves as the generator for adaptive basis scan (ABS) methods
 	elif mode is "spectral":
 		rng = int(N/M * 0.5)
 		for f_x in range(-rng, rng, 1):
@@ -155,7 +198,7 @@ def generate_patterns(resolution, scaling, A, B, threshold_flag, mode, patterns_
 				basis_list.append(phase_mask_list)
 	
 				print("F_x:" + str(f_x) + "\n" + "F_y:" + str(f_y) + "\n")
-	
+		
 	# lowpass mode - CS is achieved by generating and using only low-valued frequencies
 	elif mode is "lowpass":
 		# indexing from 1 to prevent uniform fields for arguments 0

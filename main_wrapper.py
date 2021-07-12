@@ -12,18 +12,22 @@ import fourier_module as fourier
 ## still WIP!
 import hadamard_module as hadamard
 
+import adaptive_basis as adaptive
+
 # GUI
 import PySimpleGUI as sg
 
 # math
 import numpy as np
 import matplotlib.pyplot as plt
+import scipy.fft as fft
 
 # connectivity
 #import owon_get_data as owon
 
 import arduino_control as arcon
 dev = None
+
 
 # initial definition for main menu functionality, recalled later in measurements as = []
 intensity_coeff_list = []
@@ -43,16 +47,18 @@ if os.path.exists(gallery_directory) is False:
 
 # initial reconstruction parameters
 scale = 1
-resolution = 32
+resolution = 16
 
 # TODO - add controls for mode and threshold_mode on GUI level
-mode = "spectral"
+mode = "test"
 # 0 - no threshold
 # 1 - 4 - global, local and adaptive thresholding options
 threshold_mode = 0
 
 # initial value - no normalization
 norm_mode = 0
+
+noise_magnitude = 0.1
 
 # fourier pattern generation parameters
 # TODO - add controls for parameters on GUI level
@@ -95,6 +101,10 @@ main_control_column = [
 	
 	[
 		sg.Checkbox("Hadamard method", key="-HADAMARD-", default=False),
+	],
+	
+	[
+		sg.Checkbox("Adaptive basis scan", key="-ADAPTIVE-", default=False),
 	],
 	
 	[
@@ -141,6 +151,10 @@ menu_layout = [
 	
 	[
 		sg.Checkbox("Add blue noise to GT", key="-ADD_BLUE_NOISE-", default=False),
+	],
+	
+	[
+		sg.Text("Noise magnitude: ", size =(15, 1)), sg.InputText(size=(5, 1), key="-NOISE_MAG-"),
 	],
 	
 	[
@@ -195,7 +209,7 @@ menu_layout = [
 ]
 
 # main window initialization
-main_window = sg.Window("Single Pixel Imaging Simulator - SPIS v0.5 - 25.06.21", menu_layout, finalize=True)
+main_window = sg.Window("Single Pixel Imaging Simulator - SPIS v0.6 - 11.07.21", menu_layout, finalize=True)
 #main_window.maximize()
 main_window.FindElement("-STATUS-").Update("Idle.")
 
@@ -304,16 +318,22 @@ while True:
 	# virtual/simulation reconstruction
 	if event == "-RECONSTRUCT-":
 		image_resized = aux.resize_image(image, resolution)
+		# keep the original, pre-noise image
+		image_resized_GT = image_resized
+		
+		# bugs out on the string -> float conversion. Commented out when the magnitude is not given
+		# TODO - fix!
+		#noise_magnitude = float(values["-NOISE_MAG-"])
 		
 		# Add noise to the resized, virtual GT image
 		if values["-ADD_WHITE_NOISE-"] is True:
-			image_resized = aux.add_noise(image_resized, "white")
+			image_resized = aux.add_noise(image_resized, "white", noise_magnitude)
 		
 		if values["-ADD_PINK_NOISE-"] is True:
-			image_resized = aux.add_noise(image_resized, "pink")
+			image_resized = aux.add_noise(image_resized, "pink", noise_magnitude)
 			
 		if values["-ADD_BLUE_NOISE-"] is True:
-			image_resized = aux.add_noise(image_resized, "blue")
+			image_resized = aux.add_noise(image_resized, "blue", noise_magnitude)
 			
 		if patterns == None:
 			print("No patterns! Please generate or add patterns to reconstruct the image.")
@@ -328,28 +348,55 @@ while True:
 					print("Please choose only one type of patterns!")
 				
 				elif values["-FOURIER-"] is True and values["-HADAMARD-"] is False:
-					reconstructed_image_padded, reconstructed_image, fourier_spectrum_2D, fourier_spectrum_2D_padded = fourier.reconstruct_image(resolution, scale, fourier.calculate_fourier_coeffs(fourier.mask_image(image_resized, patterns)), mode, 0, 0)
-					#aux.save_image(np.real(fourier_spectrum_2D_padded), "fourier_padded", "")
-					aux.show_images([image_resized, np.real(reconstructed_image), np.real(reconstructed_image_padded), np.real(fourier_spectrum_2D), np.real(fourier_spectrum_2D_padded)], 2, ["a) resized ground truth", "b) unpadded reconstruction", "c) padded reconstruction", "d) unpadded spectrum", "e) padded spectrum"])
-	
-					aux.calculate_PSNR(image_resized, reconstructed_image_padded)
-					aux.calculate_SSIM(image_resized, reconstructed_image_padded)
+				
+					if values["-ADAPTIVE-"] is False:
+						reconstructed_image_padded, reconstructed_image, fourier_spectrum_2D, fourier_spectrum_2D_padded = fourier.reconstruct_image(resolution, scale, fourier.calculate_fourier_coeffs(fourier.mask_image(image_resized, patterns)), mode, 0, 0)
+						aux.show_images([image_resized, np.real(reconstructed_image), np.real(reconstructed_image_padded), np.real(fourier_spectrum_2D), np.real(fourier_spectrum_2D_padded)], 2, ["a) resized ground truth", "b) unpadded reconstruction", "c) padded reconstruction", "d) unpadded spectrum", "e) padded spectrum"])
+
+						MSE, PSNR = aux.calculate_PSNR(image_resized_GT, reconstructed_image_padded)
+						SSIM = aux.calculate_SSIM(image_resized_GT, reconstructed_image_padded)
+							
+						print("MSE: " + str(MSE))
+						print("PSNR: " + str(PSNR))
+						print("SSIM: " + str(SSIM))
+					
+					elif values["-ADAPTIVE-"] is True:
+						adaptive_patterns, interpolated_image, reconstructed_image, highest_value_indices_orig = adaptive.scan(image_resized, resolution, scale)
+						
+						image_spectrum = fft.fftshift(fft.fft2(image_resized))
+						
+						_, reconstructed_image, fourier_spectrum_2D, _ = fourier.reconstruct_image(resolution, scale, fourier.calculate_fourier_coeffs(fourier.mask_image(image_resized, adaptive_patterns)), mode, 0, 0)
+						aux.show_images([image_resized, np.real(reconstructed_image), np.real(interpolated_image), np.real(image_spectrum), np.real(fourier_spectrum_2D), highest_value_indices_orig], 2, ["a) resized ground truth", "b) adaptive reconstruction", "c) interpolated image", "d) ground truth spectrum", "e) adaptive rec. spectrum", "f) adaptive spectral mask"])
+						
+						MSE, PSNR = aux.calculate_PSNR(image_resized_GT, reconstructed_image)
+						SSIM = aux.calculate_SSIM(image_resized_GT, reconstructed_image)
+							
+						print("MSE: " + str(MSE))
+						print("PSNR: " + str(PSNR))
+						print("SSIM: " + str(SSIM))
 
 				elif values["-FOURIER-"] is False and values["-HADAMARD-"] is True:
-					reconstructed_image = hadamard.reconstruct_image(resolution, scale, hadamard.mask_image(image_resized, patterns))
-					aux.show_images([image_resized, np.real(reconstructed_image)], 2, ["a) resized ground truth", "b) unpadded reconstruction"])
-
-					aux.calculate_PSNR(image_resized, reconstructed_image)
-					aux.calculate_SSIM(image_resized, reconstructed_image)
+				
+					if values["-ADAPTIVE-"] is False:
+						reconstructed_image = hadamard.reconstruct_image(resolution, scale, hadamard.mask_image(image_resized, patterns))
+						aux.show_images([image_resized, np.real(reconstructed_image)], 2, ["a) resized ground truth", "b) unpadded reconstruction"])
+						
+						MSE, PSNR = aux.calculate_PSNR(image_resized_GT, reconstructed_image)
+						SSIM = aux.calculate_SSIM(image_resized_GT, reconstructed_image)
+							
+						print("MSE: " + str(MSE))
+						print("PSNR: " + str(PSNR))
+						print("SSIM: " + str(SSIM))
+						
+					# TODO - implement simulated ABS for Hadamard basis
+					elif values["-ADAPTIVE-"] is True:
+						pass
 					
 				print("Reconstruction done.")
 				main_window.FindElement("-STATUS-").Update("Reconstruction done.")
 
 				#aux.save_image(gallery_directory, reconstructed_image, "rec_img")
 				#aux.show_images([image, image_resized, np.real(fourier_spectrum_2D_padded), np.real(reconstructed_image)], 1)
-				
-				# calculate PSNR and SSIM between the resized original image and padded reconstruction
-				
 
 			else:
 				print("Pattern size is different from the selected resolution!")
@@ -374,13 +421,23 @@ while True:
 				main_window.FindElement("-STATUS-").Update("Please choose only one type of patterns!")
 			
 			elif values["-FOURIER-"] is True and values["-HADAMARD-"] is False:
-				reconstructed_image_padded, reconstructed_image, fourier_spectrum_2D, fourier_spectrum_2D_padded = fourier.reconstruct_image(resolution, scale, intensity_coeff_list, "real", norm_mode, 0)
-				
-				aux.show_images([np.real(reconstructed_image), np.real(reconstructed_image_padded), np.real(fourier_spectrum_2D), np.real(fourier_spectrum_2D_padded)], 2, ["b) unpadded reconstruction", "c) padded reconstruction", "d) unpadded spectrum", "e) padded spectrum"])
 
-				
+				if values["-ADAPTIVE-"] is False:	
+					reconstructed_image_padded, reconstructed_image, fourier_spectrum_2D, fourier_spectrum_2D_padded = fourier.reconstruct_image(resolution, scale, intensity_coeff_list, "real", norm_mode, 0)
+					aux.show_images([np.real(reconstructed_image), np.real(reconstructed_image_padded), np.real(fourier_spectrum_2D), np.real(fourier_spectrum_2D_padded)], 2, ["b) unpadded reconstruction", "c) padded reconstruction", "d) unpadded spectrum", "e) padded spectrum"])
+
+				# TODO - implement for real measurements
+				elif values["-ADAPTIVE-"] is True:
+					pass
+
 			elif values["-FOURIER-"] is False and values["-HADAMARD-"] is True:
-				reconstructed_image = hadamard.reconstruct_image(resolution, scale, intensity_coeff_list)
+			
+				if values["-ADAPTIVE-"] is False:	
+					reconstructed_image = hadamard.reconstruct_image(resolution, scale, intensity_coeff_list)
+			
+				# TODO - implement for real measurements
+				elif values["-ADAPTIVE-"] is True:
+					pass
 			
 			print("Reconstruction done.")
 			main_window.FindElement("-STATUS-").Update("Reconstruction done.")
@@ -398,9 +455,16 @@ while True:
 			main_window.FindElement("-STATUS-").Update("Please choose only one type of patterns!")
 		
 		elif values["-FOURIER-"] is True and values["-HADAMARD-"] is False:
-			patterns = fourier.generate_patterns(resolution, scale, A, B, threshold_mode, mode, patterns_directory)
-			print("Fourier patterns generated to memory.")
-			main_window.FindElement("-STATUS-").Update("Fourier patterns generated to memory.")
+			
+			if values["-ADAPTIVE-"] == False:
+				patterns = fourier.generate_patterns(resolution, scale, A, B, threshold_mode, mode, patterns_directory)
+				print("Fourier patterns generated to memory.")
+				main_window.FindElement("-STATUS-").Update("Fourier patterns generated to memory.")
+			
+			else:
+				patterns = [[np.zeros((resolution, resolution))]]
+				print("Generating placeholder pattern for adaptive basis scan method.")
+				main_window.FindElement("-STATUS-").Update("Generating placeholder pattern for adaptive basis scan method.")
 		
 		elif values["-FOURIER-"] is False and values["-HADAMARD-"] is True:
 			patterns = hadamard.generate_patterns(resolution, scale)
@@ -609,6 +673,8 @@ while True:
 		main_window.FindElement("-STATUS-").Update("Parameter values changed.")
 	
 	# control remote systems for modulation and detection
+	# TODO
+	#	move the process into a separate function (Fourier/Hadamard) - required for e.g. adaptive basis scanning!
 	elif event == "-REMOTE_CONTROL-":
 		# remote control window initialization
 		remote_window = sg.Window("Remote control", remote_control_layout, finalize=True)

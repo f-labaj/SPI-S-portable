@@ -21,6 +21,8 @@ import paramiko
 
 import math
 
+import colorednoise as cn
+
 # https://stackoverflow.com/questions/2489435/check-if-a-number-is-a-perfect-square
 def is_square(integer):
 	root = math.sqrt(integer)
@@ -215,7 +217,7 @@ def show_images(images, cols = 2, titles = None):
 	titles: List of titles corresponding to each image. Must have
 			the same length as titles.
 	"""
-	plt.rcParams.update({'font.size': 22})
+	plt.rcParams.update({'font.size': 16})
 	
 	assert((titles is None)or (len(images) == len(titles)))
 	n_images = len(images)
@@ -247,16 +249,73 @@ def calculate_PSNR(ground_truth, reconstructed_image):
 	MSE = mean_squared_error(ground_truth, np.real(reconstructed_image))
 	PSNR = 10*math.log10(ground_truth.max()**2 / MSE)
 
-	print("\nMSE: " + str(MSE))
-	print("PSNR: " + str(PSNR))
-	
-	# TODO!
+	return (MSE, PSNR)
 	
 def calculate_SSIM(ground_truth, reconstructed_image):
 	SSIM = ssim(ground_truth, np.real(reconstructed_image))
 
-	print("\nSSIM: " + str(SSIM))
+	return SSIM
+
+# TODO: change to 2D
+# https://www.socsci.ru.nl/wilberth/python/noise.html
+def spectrum_noise(spectrum_func, samples=1024, rate=44100):
+    """ 
+    make noise with a certain spectral density
+    """
+    freqs = np.fft.rfftfreq(samples, 1.0/rate)            # real-fft frequencies (not the negative ones)
+    spectrum = np.zeros_like(freqs, dtype='complex')      # make complex numbers for spectrum
+    spectrum[1:] = spectrum_func(freqs[1:])               # get spectrum amplitude for all frequencies except f=0
+    phases = np.random.uniform(0, 2*np.pi, len(freqs)-1)  # random phases for all frequencies except f=0
+    spectrum[1:] *= np.exp(1j*phases)                     # apply random phases
+    noise = np.fft.irfft(spectrum)                        # return the reverse fourier transform
+    noise = np.pad(noise, (0, samples - len(noise)), 'constant') # add zero for odd number of input samples
+ 
+    return noise
+
+# https://www.socsci.ru.nl/wilberth/python/noise.html
+def pink_spectrum(f, f_min=0, f_max=np.inf, att=np.log10(2.0)*10):
+    """
+    Define a pink (1/f) spectrum
+        f     = array of frequencies
+        f_min = minimum frequency for band pass
+        f_max = maximum frequency for band pass
+        att   = attenuation per factor two in frequency in decibel.
+                Default is such that a factor two in frequency increase gives a factor two in power attenuation.
+    """
+    # numbers in the equation below explained:
+    #  0.5: take the square root of the power spectrum so that we get an amplitude (field) spectrum 
+    # 10.0: convert attenuation from decibel to bel
+    #  2.0: frequency factor for which the attenuation is given (octave)
+    s = f**-( 0.5 * (att/10.0) / np.log10(2.0) )  # apply attenuation
+    s[np.logical_or(f < f_min, f > f_max)] = 0    # apply band pass
+    return s
 
 # TODO
-def add_noise(image, noise_type):
-	pass
+def add_noise(image, noise_type, magnitude):
+	noisy_image = image
+	N = image.shape[0]
+
+	# https://numpy.org/doc/stable/reference/random/generated/numpy.random.rand.html
+	if noise_type == "white":
+		noisy_image += magnitude * np.random.rand(image.shape[0], image.shape[1])
+		
+	# https://www.socsci.ru.nl/wilberth/python/noise.html
+	elif noise_type == "pink":
+		pass
+
+	elif noise_type == "pink_2":
+		# check if it can take a tuple/N-dimensional
+		cn.powerlaw_psd_gaussian(1, (N, N))
+		
+	elif noise_type == "blue":
+		# a possible implementation: https://github.com/MomentsInGraphics/BlueNoise/blob/master/BlueNoise.py
+		pass
+		
+	elif noise_type == "brown":
+		# check if it can take a tuple/N-dimensional
+		cn.powerlaw_psd_gaussian(2, (N, N))
+
+	else:
+		print("Incorrect noise type selected!")
+
+	return noisy_image

@@ -59,6 +59,8 @@ def generate_patterns(resolution, scale):
 	# TODO - check if N**2 * M is correct
 	# alternate - (N*M) **2
 	
+	start = time.time()
+	
 	hadamard_matrix = np.array(hadamard(int((N**2))))
 
 	# DEBUG
@@ -80,13 +82,22 @@ def generate_patterns(resolution, scale):
 
 		mask_list.append([mask_pos, mask_neg])
 		
+	end = time.time()
+	print("\Generation time: " + str(float(end-start)) + "s\n")	
+	
 	return mask_list
 
 def mask_image(image_gray, mask_list):
+	
+	start = time.time()
+
 	intensity_vector = []
 	
 	for mask_pair in mask_list:
 		intensity_vector.append(np.sum(image_gray*mask_pair[0])-np.sum(image_gray*mask_pair[1]))
+
+	end = time.time()
+	print("\Masking time: " + str(float(end-start)) + "s\n")	
 
 	return intensity_vector
 
@@ -94,6 +105,8 @@ def mask_image(image_gray, mask_list):
 def reconstruct_image(resolution, scale, intensity_vector):
 	N = resolution
 	M = scale
+	
+	start = time.time()
 	
 	############ Check if this works for scales other than 1!
 	# check if our measured vector has the correct size
@@ -125,6 +138,9 @@ def reconstruct_image(resolution, scale, intensity_vector):
 	result_pre = hadamard_matrix.dot(intensity_vector)
 	result_final = np.reshape(result_pre, (int(N),int(N)))
 	result_final *= (1.0/result_final.max())
+		
+	end = time.time()
+	print("\Coefficient calculation and reconstruction time: " + str(float(end-start)) + "s\n")	
 		
 	return result_final
 
